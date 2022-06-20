@@ -2,11 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt   
 from matplotlib import rc, rcParams
 import pandas as pd
-from astropy.coordinates import SkyCoord  # High-level coordinates
-from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
-from astropy.coordinates import Angle, Latitude, Longitude  # Angles
-import astropy.units as u
-import astropy.coordinates as coord
 from astropy.modeling.models import Voigt1D
 from scipy.interpolate import griddata
 from matplotlib.collections import LineCollection
@@ -61,6 +56,8 @@ class GreatCircleDistance(kernels.stationary.Distance):
         return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
 
 
+df = pd.read_csv('NHI_data.csv')
+
 phi = np.linspace(0, 2.*np.pi, 200)
 theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
 phi_grid, theta_grid = np.meshgrid(phi, theta, indexing="ij")
@@ -76,44 +73,6 @@ X_grid = np.vstack(
 
 X_grid_RADec = np.vstack((phi_grid,theta_grid))
 
-## read in my data
-df = pd.read_csv('/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE-2/ISM/ISM column densities - Sheet7.csv')
-
-MgII=False
-if MgII:
-    zero_nHI_mask = df['n(HI)'] == 0
-    df['n(HI)'][zero_nHI_mask] = df['n(MgII)'][zero_nHI_mask] / 3.6e-6 # from Linsky+2019
-    df['N(HI)'][zero_nHI_mask] = np.log10(df['n(HI)'][zero_nHI_mask] * df['distance (pc)'] * 3.09e18)
-    df['N(HI) uncertainty'][zero_nHI_mask] = '0.35' # dex
-
-
-
-df = df.drop(df[np.isnan(df['N(HI)'])].index) # drop the ones without direct HI data
-df = df.drop(df[df['distance (pc)'] > 40].index) # drop the ones above some distance criterion
-
-df.reset_index(inplace=True) # reindex
-
-df['SkyCoord'] = 0 # setup new column for SkyCoord objects
-
-for i in range(len(df)):
-
-    ra_hms = df['RA'].loc[i]
-    dec_dms = df['DEC'].loc[i]
-
-    c = SkyCoord(str(ra_hms) + ' ' + str(dec_dms), frame='icrs', unit=(u.hourangle, u.deg))
-
-    df['RA'].loc[i] = c.ra.deg
-    df['DEC'].loc[i] = c.dec.deg
-
-    #df['SkyCoord'].loc[i] = c
-
-NHI_error = np.array([np.array(i.replace('-','').split(',')).astype(float).mean() for i in df['N(HI) uncertainty']]) ## i'm just taking
-## average of any asymmetric error bars! probably want to do this right later!
-#nHI_error = np.sqrt(NHI_error**2 * (np.log(10) * 10**df['N(HI)'] / (df['distance (pc)']*3.09e18))**2 + \
-#                      df['distance error']**2 * (1/(df['distance (pc)']*3.09e18)**2  * 10**df['N(HI)'])**2)
-#mask_neg_err = nHI_error/df['n(HI)'] >=1
-#nHI_error[mask_neg_err] = df['n(HI)'][mask_neg_err]
-#df['n(HI) uncertainty'] = nHI_error ## there is one going negative - going to cut it off
 
 skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree)
 X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
@@ -121,40 +80,10 @@ theta_obs = df['DEC'].values * np.pi/180.
 phi_obs  = df['RA'].values * np.pi/180.
 
 y_obs = df['N(HI)'].values
-yerr=NHI_error
+yerr= df['N(HI) uncertainty'].values
 
 d = df['distance (pc)']
 
-EUVE = False
-if EUVE:
-    df_euve = pd.read_csv('/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE-2/ISM/ISM column densities - EUVE NHI measurements.csv')
-    df_euve = df_euve.drop(df_euve[df_euve['PLX_VALUE'] < 10.].index) # drop the ones outside 100 pc
-    df_euve.reset_index(inplace=True) # reindex
-
-    dist = 1e3/df_euve['PLX_VALUE']
-    dist_err = df_euve['PLX_ERROR']/df_euve['PLX_VALUE'] * dist
-
-    df_euve['n(HI)'] = df_euve['N(HI)'] / (dist * 3.09e18)
-    df_euve['n(HI) uncertainty'] = 0
-    NHI_error = np.array([np.array(i.replace('-','').split(',')).astype(float).mean() for i in df_euve['N(HI) uncertainty']]) ## i'm just taking
-    ## average of any asymmetric error bars! probably want to do this right later!
-    nHI_error = np.sqrt(NHI_error**2 * (np.log(10) * 10**df_euve['N(HI)'] / (dist*3.09e18))**2 + \
-                      dist_err**2 * (1/(dist*3.09e18)**2  * 10**df_euve['N(HI)'])**2)
-    mask_neg_err = nHI_error/df_euve['n(HI)'] >=1
-    nHI_error[mask_neg_err] = df_euve['n(HI)'][mask_neg_err]
-    df_euve['n(HI) uncertainty'] = nHI_error 
-
-
-    phi_obs = np.append(phi_obs, df_euve['RA'].values * np.pi/180.)
-    theta_obs = np.append(theta_obs, df_euve['DEC'].values * np.pi/180.)
-
-    y_obs = np.append(y_obs, df_euve['n(HI)'].values)
-    yerr = np.append(yerr, df_euve['n(HI) uncertainty'].values)
-
-    d = np.append(d, dist)
-
-    skycoords = SkyCoord(ra= phi_obs * u.radian, dec = theta_obs * u.radian)
-    X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
 
 # Plot the map
 fig=plt.figure()
@@ -172,9 +101,6 @@ plt.figure()
 plt.errorbar(d,y_obs,yerr=yerr,fmt='ko')
 plt.xlabel('Distance (pc)',fontsize=18)
 plt.ylabel('N(HI)',fontsize=18)
-
-
-
 
 
 
