@@ -9,7 +9,7 @@ df = pd.read_csv('/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE-2/ISM/ISM c
 
 
 df = df.drop(df[np.isnan(df['N(HI)'])].index) # drop the ones without direct HI data
-df = df.drop(df[df['distance (pc)'] > 40].index) # drop the ones above some distance criterion
+df = df.drop(df[df['distance (pc)'] > 100].index) # drop the ones above some distance criterion
 
 df.reset_index(inplace=True) # reindex
 
