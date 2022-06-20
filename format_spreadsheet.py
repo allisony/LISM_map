@@ -33,7 +33,7 @@ df['N(HI) uncertainty'] = NHI_error
 df_to_save = df[['Star Name', 'distance (pc)', 'distance error', 'N(HI)', 'N(HI) uncertainty', 'N(HI) source', 'RA', 'DEC']].copy()
 
 
-EUVE = True
+EUVE = False
 if EUVE:
     df_euve = pd.read_csv('/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE-2/ISM/ISM column densities - EUVE NHI measurements.csv')
     df_euve = df_euve.drop(df_euve[df_euve['PLX_VALUE'] < 10.].index) # drop the ones outside 100 pc
@@ -45,7 +45,10 @@ if EUVE:
     #df_euve['n(HI)'] = df_euve['N(HI)'] / (dist * 3.09e18)
     #df_euve['n(HI) uncertainty'] = 0
     NHI_error = np.array([np.array(i.replace('-','').split(',')).astype(float).mean() for i in df_euve['N(HI) uncertainty']]) ## i'm just taking
-    df_euve['N(HI) uncertainty'] = NHI_error
+    
+    df_euve['N(HI) uncertainty'] = np.mean([np.log10(df_euve['N(HI)'] + NHI_error)-np.log10(df_euve['N(HI)']),
+                         np.log10(df_euve['N(HI)'])-np.log10(df_euve['N(HI)'] - NHI_error)], axis=0)
+    df_euve['N(HI)'] = np.log10(df_euve['N(HI)'])
     df_euve['N(HI) source'] = df_euve['Reference']
     df_euve['Star Name'] = df_euve['Name']
     ## average of any asymmetric error bars! probably want to do this right later!
