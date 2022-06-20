@@ -45,7 +45,6 @@ plt.ion()
 
 #rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
 
-# Make a spherical grid
 
 class GreatCircleDistance(kernels.stationary.Distance):
     def distance(self, X1, X2):
@@ -56,8 +55,12 @@ class GreatCircleDistance(kernels.stationary.Distance):
         return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
 
 
-df = pd.read_csv('NHI_data.csv')
 
+## Read in the data -- see format_spreadsheet.py ###
+df = pd.read_csv('NHI_data.csv')
+####################################################
+
+## Make a spherical grid#############################
 phi = np.linspace(0, 2.*np.pi, 200)
 theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
 phi_grid, theta_grid = np.meshgrid(phi, theta, indexing="ij")
@@ -72,20 +75,24 @@ X_grid = np.vstack(
 ).T
 
 X_grid_RADec = np.vstack((phi_grid,theta_grid))
+####################################################
 
-
+## Put star coordinates on that grid ###############
 skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree)
 X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
 theta_obs = df['DEC'].values * np.pi/180. 
 phi_obs  = df['RA'].values * np.pi/180.
+####################################################
 
+
+## Set up data to fit ##############################
 y_obs = df['N(HI)'].values
 yerr= df['N(HI) uncertainty'].values
 
 d = df['distance (pc)']
+####################################################
 
-
-# Plot the map
+## Plot the data ####################################
 fig=plt.figure()
 ax=fig.add_subplot(111,projection='mollweide')
 ax.scatter(
@@ -101,10 +108,10 @@ plt.figure()
 plt.errorbar(d,y_obs,yerr=yerr,fmt='ko')
 plt.xlabel('Distance (pc)',fontsize=18)
 plt.ylabel('N(HI)',fontsize=18)
+#######################################################
 
-
-
-def numpyro_model(X_obs, yerr, y=None):
+## Define model to fit ################################
+def numpyro_model(X_obs, yerr, y=None): 
     avg1 = numpyro.sample("log_avg", dist.Cauchy(18,2))
 
     amp1 = numpyro.sample("log_amp", dist.Cauchy(0,10))
@@ -125,8 +132,9 @@ def numpyro_model(X_obs, yerr, y=None):
 
     if y is not None:
         numpyro.deterministic("pred", gp.predict(y, X_grid))
+#######################################################
 
-
+## set up NUTS ################################################
 nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
 mcmc = MCMC(
     nuts_kernel,
@@ -136,23 +144,25 @@ mcmc = MCMC(
     progress_bar=True,
 )
 rng_key = jax.random.PRNGKey(34913)
+################################################################
 
-
+## Run the MCMC ################################################
 mcmc.run(rng_key, X_obs, yerr, y=y_obs)
+###############################################################
+
+## Get fit results ###########################################
 samples = mcmc.get_samples()
 pred = samples["pred"].block_until_ready()  # Blocking to get timing right
-
-
-
 data = az.from_numpyro(mcmc)
 print(az.summary(
     data, var_names=[v for v in data.posterior.data_vars if v != "pred"]
-))
+     ))
 
 q = np.percentile(pred, [15.9, 50, 84.1], axis=0)
-
 unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
+#######################################################
 
+## Plot fit results ###################################
 fig=plt.figure(figsize=(24,6))
 ax1=fig.add_subplot(131,projection='mollweide')
 ax2=fig.add_subplot(132,projection='mollweide')
@@ -213,6 +223,7 @@ eee=ax3.scatter(
 cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
 fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in n(HI) estimate')
 
+#####################################################################
 """
 ndim=4
 nbins=20
@@ -225,7 +236,7 @@ triangle.corner(data, bins=nbins, #labels=variable_names,
                       max_n_ticks=3,plot_contours=True,quantiles=quantiles,fig=fig,
                       show_titles=True,verbose=True,truths=truths,range=None)
 """
-
+## Plot histogram of results #########################################
 bins=50
 alpha=0.3
 c0='C0'
@@ -256,8 +267,10 @@ for i in range(len(data.posterior.log_amp.values)):
 ax1.set_xlabel('log amp')
 ax4.set_xlabel('log avg')
 ax2.set_xlabel('log scale')
+#######################################################################
 
 
+## Save fit results to file ############################################
 np.savetxt('NHI_column_map.txt',q[1])
 np.savetxt('NHI_column_fitted_stars.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
-
+#######################################################################
