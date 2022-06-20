@@ -246,8 +246,8 @@ colors=['C0','C1','C2','C3']
 fig=plt.figure(figsize=(8,8))
 ax1 = fig.add_subplot(231)
 ax2 = fig.add_subplot(232)
-ax3 = fig.add_subplot(233)
-ax4 = fig.add_subplot(234)
+#ax3 = fig.add_subplot(233)
+ax4 = fig.add_subplot(233)
 #ax5 = fig.add_subplot(235)
 
 for i in range(len(data.posterior.log_amp.values)):
