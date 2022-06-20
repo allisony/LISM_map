@@ -1,4 +1,4 @@
-from EUV_HI_HeI_abs import *
+from plot_EUV_ISM_attenuation_curve import *
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
@@ -237,7 +237,7 @@ cbar.set_label('Fractional uncertainty',fontsize=18)
 
 
 if he_uncertainty:
-    filename = "fractional_uncertainties_100_600_Ang_with_helium_var.pkl"
+    filename = "fractional_uncertainties_100_600_Ang_with_helium_var.pkl" # save these somewhere else!
 
 else:
 

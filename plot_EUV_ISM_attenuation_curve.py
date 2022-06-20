@@ -129,7 +129,7 @@ wave = np.arange(50,950,1)
 rel_he1 = 0.08
 frac_he2 = 0.6
 
-h1_cols = np.array([17.5, 18.0, 18.5])
+h1_cols = np.array([17.5, 18.0, 18.5, 19.0])
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
