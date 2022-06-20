@@ -52,7 +52,7 @@ ax.set_ylim([17,19.5])
 
 
 
-## distance shell averages? (add in area-weighting later!)
+## distance shell averages? (add in area-weighting later! or not)
 nHI = 10**(df['N(HI)']) / (df['distance (pc)'] * 3.09e18)
 
 d_avgs = np.logspace(0,2,15)
