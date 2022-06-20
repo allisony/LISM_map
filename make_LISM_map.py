@@ -25,27 +25,26 @@ import corner as triangle
 from scipy.interpolate import griddata
 
 config.update("jax_enable_x64", True)
-
-
 pd.options.mode.chained_assignment = None
 
+
+## Pretty plot setup ###################################
 plt.ion()
 
+rc('font',**{'family':'sans-serif'})
+rc('text', usetex=True)
 
-#rc('font',**{'family':'sans-serif'})
-#rc('text', usetex=True)
+label_size = 16
+rcParams['xtick.labelsize'] = label_size 
+rcParams['ytick.labelsize'] = label_size
 
-#label_size = 16
-#rcParams['xtick.labelsize'] = label_size 
-#rcParams['ytick.labelsize'] = label_size
-
-
-#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-#rc('text', usetex=True)
-
-#rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
+####################################################
 
 
+## Define Haversine distance class for use with tinygp ##################
 class GreatCircleDistance(kernels.stationary.Distance):
     def distance(self, X1, X2):
         if jnp.shape(X1) != (3,) or jnp.shape(X2) != (3,):
@@ -53,7 +52,7 @@ class GreatCircleDistance(kernels.stationary.Distance):
                 "The great-circle distance is only defined for unit 3-vector"
             )
         return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
-
+##############################################################################
 
 
 ## Read in the data -- see format_spreadsheet.py ###
