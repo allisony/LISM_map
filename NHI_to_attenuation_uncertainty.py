@@ -113,7 +113,7 @@ rel_he1_val = 0.08
 rel_he1_sig = 0.02
 frac_he2_val = 0.6
 frac_he2_sig = 0.2
-he_uncertainty = True
+he_uncertainty = False
 
 fractional_uncertainties_to_store = np.zeros((len(h1_col_mean_array),len(h1_col_sig_array),int(mask.sum())))
 
@@ -190,13 +190,13 @@ ax4.contourf(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),vmin=0.0
 ax5.contourf(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),vmin=0.01, vmax=1,levels=levels)
 ax6.contourf(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),vmin=0.01, vmax=1,levels=levels)
 
-
-ax1.contour(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=[0.35],color='k')
-ax2.contour(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),levels=[0.35],color='k')
-ax3.contour(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),levels=[0.35],color='k')
-ax4.contour(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),levels=[0.35],color='k')
-ax5.contour(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),levels=[0.35],color='k')
-ax6.contour(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),levels=[0.35],color='k')
+if False:
+    ax1.contour(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=[0.35],color='k')
+    ax2.contour(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),levels=[0.35],color='k')
+    ax3.contour(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),levels=[0.35],color='k')
+    ax4.contour(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),levels=[0.35],color='k')
+    ax5.contour(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),levels=[0.35],color='k')
+    ax6.contour(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),levels=[0.35],color='k')
 
 
 ax1.minorticks_on()
@@ -237,13 +237,14 @@ cbar.set_label('Fractional uncertainty',fontsize=18)
 
 
 if he_uncertainty:
-    filename = "fractional_uncertainties_100_600_Ang_with_helium_var.pkl" # save these somewhere else!
+    filename = "../fractional_uncertainties_100_600_Ang_with_helium_var.pkl" # save these somewhere else!
 
 else:
 
-    filename = "fractional_uncertainties_100_600_Ang.pkl"
+    filename = "../fractional_uncertainties_100_600_Ang.pkl"
 
 with open(filename, "wb") as f:
 
         joblib.dump([h1_col_mean_array,h1_col_sig_array,fractional_uncertainties_to_store], f)
 
+plt.savefig(filename.replace('.pkl','.png'))
