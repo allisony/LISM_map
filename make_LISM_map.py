@@ -89,6 +89,22 @@ y_obs = df['N(HI)'].values
 yerr= df['N(HI) uncertainty'].values
 
 d = df['distance (pc)']
+
+run_loop = True
+n_runs = 10
+
+if True:
+
+    mask = d <= 10
+
+    y_obs = y_obs[mask]
+    yerr = yerr[mask]
+    theta_obs = theta_obs[mask]
+    phi_obs = phi_obs[mask]
+    X_obs = X_obs[mask]
+    d = d[mask]
+
+
 ####################################################
 
 ## Plot the data ####################################
@@ -108,6 +124,9 @@ plt.errorbar(d,y_obs,yerr=yerr,fmt='ko')
 plt.xlabel('Distance (pc)',fontsize=18)
 plt.ylabel('N(HI)',fontsize=18)
 #######################################################
+
+#import pdb; pdb.set_trace()
+
 
 ## Define model to fit ################################
 def numpyro_model(X_obs, yerr, y=None): 
@@ -133,96 +152,127 @@ def numpyro_model(X_obs, yerr, y=None):
         numpyro.deterministic("pred", gp.predict(y, X_grid))
 #######################################################
 
-## set up NUTS ################################################
-nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
-mcmc = MCMC(
-    nuts_kernel,
-    num_warmup=1000,
-    num_samples=2000,
-    num_chains=2,
-    progress_bar=True,
-)
-rng_key = jax.random.PRNGKey(34913)
-################################################################
 
-## Run the MCMC ################################################
-mcmc.run(rng_key, X_obs, yerr, y=y_obs)
-###############################################################
+if run_loop:
 
-## Get fit results ###########################################
-samples = mcmc.get_samples()
-pred = samples["pred"].block_until_ready()  # Blocking to get timing right
-data = az.from_numpyro(mcmc)
-print(az.summary(
-    data, var_names=[v for v in data.posterior.data_vars if v != "pred"]
-     ))
+    q_array = np.zeros((n_runs,len(phi)))
 
-q = np.percentile(pred, [15.9, 50, 84.1], axis=0)
-unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
-#######################################################
+    y_obs_orig = y_obs.copy()
 
-## Plot fit results ###################################
-fig=plt.figure(figsize=(24,6))
-ax1=fig.add_subplot(131,projection='mollweide')
-ax2=fig.add_subplot(132,projection='mollweide')
-ax3=fig.add_subplot(133,projection='mollweide')
+    for i in range(n_runs):
 
-cbar_h=0.075
-cbar_w=0.2
-cbar_bottom=0.1
+        y_obs = np.random.normal(loc=y_obs_orig, scale=yerr)
 
-#ax.imshow(q[1].reshape(len(phi),len(theta)),extent=[0,360,-90,90],origin='lower',vmin=q[1].min(),vmax=q[1].max())
-im=ax1.pcolor(
-    phi-np.pi,
-    theta,
-    q[1].reshape((len(phi), len(theta))).T,
-    vmin=17,vmax=19)
+        ## set up NUTS ################################################
+        nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
+            mcmc = MCMC(
+                    nuts_kernel,
+                    num_warmup=1000,
+                    num_samples=2000,
+                    num_chains=2,
+                    progress_bar=True,
+                    )
+                    rng_key = jax.random.PRNGKey(34913)
+
+        mcmc.run(rng_key, X_obs, yerr, y=y_obs)
+        samples = mcmc.get_samples()
+        pred = samples["pred"].block_until_ready()  # Blocking to get timing right
+        data = az.from_numpyro(mcmc)
+        q_array[i,:] = np.median(pred)
+
+else:
 
 
-ax1.scatter(
-    phi_obs-np.pi,
-    theta_obs,
-    c=y_obs,
-    edgecolor="k",vmin=17,vmax=19)
+    ## set up NUTS ################################################
+    nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
+        mcmc = MCMC(
+        nuts_kernel,
+        num_warmup=1000,
+        num_samples=2000,
+        num_chains=2,
+        progress_bar=True,
+        )
+    rng_key = jax.random.PRNGKey(34913)
+    ################################################################
 
-cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
+    ## Run the MCMC ################################################
+    mcmc.run(rng_key, X_obs, yerr, y=y_obs)
+    ###############################################################
 
-fig.colorbar(im, orientation="horizontal",cax=cax,label='n(HI) (cm-3)')
+    ## Get fit results ###########################################
+    samples = mcmc.get_samples()
+    pred = samples["pred"].block_until_ready()  # Blocking to get timing right
+    data = az.from_numpyro(mcmc)
+    print(az.summary(
+        data, var_names=[v for v in data.posterior.data_vars if v != "pred"]
+         ))
+
+    q = np.percentile(pred, [15.9, 50, 84.1], axis=0)
+    unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
+    #######################################################
+
+    ## Plot fit results ###################################
+    fig=plt.figure(figsize=(24,6))
+    ax1=fig.add_subplot(131,projection='mollweide')
+    ax2=fig.add_subplot(132,projection='mollweide')
+    ax3=fig.add_subplot(133,projection='mollweide')
+
+    cbar_h=0.075
+    cbar_w=0.2
+    cbar_bottom=0.1
+
+    #ax.imshow(q[1].reshape(len(phi),len(theta)),extent=[0,360,-90,90],origin='lower',vmin=q[1].min(),vmax=q[1].max())
+    im=ax1.pcolor(
+        phi-np.pi,
+        theta,
+        q[1].reshape((len(phi), len(theta))).T,
+        vmin=17,vmax=19)
 
 
-pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
-im=ax2.pcolor(
-    phi-np.pi,
-    theta,
-    (unc/q[1]).reshape((len(phi), len(theta))).T / np.log(10) ,#pred_unc,
-    cmap='gray')
+    ax1.scatter(
+        phi_obs-np.pi,
+        theta_obs,
+        c=y_obs,
+        edgecolor="k",vmin=17,vmax=19)
+
+    cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
+
+    fig.colorbar(im, orientation="horizontal",cax=cax,label='n(HI) (cm-3)')
 
 
-ax2.plot(
-    phi_obs-np.pi,
-    theta_obs,
-    'o',ms=7,mfc='none',mec='m')
-
-cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
-fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
-
-
-## I want this one to plot the fractional uncertainty!
-phi_grid, theta_grid=np.meshgrid(phi,theta)
-y_pred = griddata((phi_grid.flatten(),theta_grid.flatten()),q[1],(phi_obs,theta_obs))
-residuals = (y_obs - y_pred)#/y_obs
+    pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
+    im=ax2.pcolor(
+        phi-np.pi,
+        theta,
+        (unc/q[1]).reshape((len(phi), len(theta))).T / np.log(10) ,#pred_unc,
+        cmap='gray')
 
 
-eee=ax3.scatter(
-    phi_obs-np.pi,
-    theta_obs,
-    c=residuals,
-    edgecolor="k",cmap='PiYG',vmin=-0.1,vmax=0.1)
+    ax2.plot(
+        phi_obs-np.pi,
+        theta_obs,
+        'o',ms=7,mfc='none',mec='m')
 
-cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
-fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in n(HI) estimate')
+    cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
+    fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
 
-#####################################################################
+
+    ## I want this one to plot the fractional uncertainty!
+    phi_grid, theta_grid=np.meshgrid(phi,theta)
+    y_pred = griddata((phi_grid.flatten(),theta_grid.flatten()),q[1],(phi_obs,theta_obs))
+    residuals = (y_obs - y_pred)#/y_obs
+
+
+    eee=ax3.scatter(
+        phi_obs-np.pi,
+        theta_obs,
+        c=residuals,
+        edgecolor="k",cmap='PiYG',vmin=-0.3,vmax=0.3)
+
+    cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
+    fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in N(HI) estimate')
+
+    #####################################################################
 """
 ndim=4
 nbins=20
@@ -235,41 +285,42 @@ triangle.corner(data, bins=nbins, #labels=variable_names,
                       max_n_ticks=3,plot_contours=True,quantiles=quantiles,fig=fig,
                       show_titles=True,verbose=True,truths=truths,range=None)
 """
-## Plot histogram of results #########################################
-bins=50
-alpha=0.3
-c0='C0'
-c1='C1'
+    ## Plot histogram of results #########################################
+    bins=50
+    alpha=0.3
+    c0='C0'
+    c1='C1'
 
-colors=['C0','C1','C2','C3']
+    colors=['C0','C1','C2','C3']
 
-fig=plt.figure(figsize=(8,8))
-ax1 = fig.add_subplot(231)
-ax2 = fig.add_subplot(232)
-#ax3 = fig.add_subplot(233)
-ax4 = fig.add_subplot(233)
-#ax5 = fig.add_subplot(235)
+    fig=plt.figure(figsize=(8,8))
+    ax1 = fig.add_subplot(231)
+    ax2 = fig.add_subplot(232)
+    #ax3 = fig.add_subplot(233)
+    ax4 = fig.add_subplot(233)
+    #ax5 = fig.add_subplot(235)
 
-for i in range(len(data.posterior.log_amp.values)):
-    ax1.hist(data.posterior.log_amp.values[i],bins=bins,alpha=alpha,color=colors[i])
+    for i in range(len(data.posterior.log_amp.values)):
+        ax1.hist(data.posterior.log_amp.values[i],bins=bins,alpha=alpha,color=colors[i])
 
-    ax2.hist(data.posterior.log_scale.values[i],bins=bins,alpha=alpha,color=colors[i])
+        ax2.hist(data.posterior.log_scale.values[i],bins=bins,alpha=alpha,color=colors[i])
 
 
-    ax4.hist(data.posterior.log_avg.values[i],bins=bins,alpha=alpha,color=colors[i])
-    alpha += 0.1
+        ax4.hist(data.posterior.log_avg.values[i],bins=bins,alpha=alpha,color=colors[i])
+        alpha += 0.1
 
 #ax5.hist(data.posterior.log_c.values[0],bins=bins,alpha=alpha,color=c0)
 #ax5.hist(data.posterior.log_c.values[1],bins=bins,alpha=alpha,color=c1)
 #ax5.set_xlabel('log constant')
 
-ax1.set_xlabel('log amp')
-ax4.set_xlabel('log avg')
-ax2.set_xlabel('log scale')
-#######################################################################
+    ax1.set_xlabel('log amp')
+    ax4.set_xlabel('log avg')
+    ax2.set_xlabel('log scale')
+    #######################################################################
 
 
-## Save fit results to file ############################################
-np.savetxt('NHI_column_map.txt',q[1])
-np.savetxt('NHI_column_fitted_stars.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
-#######################################################################
+    ## Save fit results to file ############################################
+    if False:
+        np.savetxt('NHI_column_map.txt',q[1])
+        np.savetxt('NHI_column_fitted_stars.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
+    #######################################################################
