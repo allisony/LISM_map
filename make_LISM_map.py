@@ -157,11 +157,15 @@ if run_loop:
 
     q_array = np.zeros((n_runs,len(phi)))
 
-    y_obs_orig = y_obs.copy()
+    log_amp_array = np.zeros(n_runs)
+    log_avg_array = log_amp_array.copy()
+    log_scale_array = log_amp_array.copy()
+
+    
 
     for i in range(n_runs):
 
-        y_obs = np.random.normal(loc=y_obs_orig, scale=yerr)
+        y_obs_samp = np.random.normal(loc=y_obs, scale=yerr)
 
         ## set up NUTS ################################################
         nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
@@ -174,11 +178,16 @@ if run_loop:
                     )
                     rng_key = jax.random.PRNGKey(34913)
 
-        mcmc.run(rng_key, X_obs, yerr, y=y_obs)
+        mcmc.run(rng_key, X_obs, yerr, y=y_obs_samp)
         samples = mcmc.get_samples()
         pred = samples["pred"].block_until_ready()  # Blocking to get timing right
         data = az.from_numpyro(mcmc)
         q_array[i,:] = np.median(pred)
+        log_amp_array[i] = data.posterior.log_amp.values.reshape(4000) # should automate this = 2 * 2000 (num_samples * num_chains)
+        log_avg_array[i] = data.posterior.log_avg.values.reshape(4000)
+        log_scale_array[i] = data.posterior.log_scale.values.reshape(4000)
+
+        q = np.percentile(q_array, [15.9, 50, 84.1], axis=0)
 
 else:
 
@@ -208,71 +217,73 @@ else:
          ))
 
     q = np.percentile(pred, [15.9, 50, 84.1], axis=0)
-    unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
-    #######################################################
+    
 
-    ## Plot fit results ###################################
-    fig=plt.figure(figsize=(24,6))
-    ax1=fig.add_subplot(131,projection='mollweide')
-    ax2=fig.add_subplot(132,projection='mollweide')
-    ax3=fig.add_subplot(133,projection='mollweide')
+unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
+#######################################################
 
-    cbar_h=0.075
-    cbar_w=0.2
-    cbar_bottom=0.1
+## Plot fit results ###################################
+fig=plt.figure(figsize=(24,6))
+ax1=fig.add_subplot(131,projection='mollweide')
+ax2=fig.add_subplot(132,projection='mollweide')
+ax3=fig.add_subplot(133,projection='mollweide')
 
-    #ax.imshow(q[1].reshape(len(phi),len(theta)),extent=[0,360,-90,90],origin='lower',vmin=q[1].min(),vmax=q[1].max())
-    im=ax1.pcolor(
+cbar_h=0.075
+cbar_w=0.2
+cbar_bottom=0.1
+
+#ax.imshow(q[1].reshape(len(phi),len(theta)),extent=[0,360,-90,90],origin='lower',vmin=q[1].min(),vmax=q[1].max())
+im=ax1.pcolor(
         phi-np.pi,
         theta,
         q[1].reshape((len(phi), len(theta))).T,
         vmin=17,vmax=19)
 
 
-    ax1.scatter(
+ax1.scatter(
         phi_obs-np.pi,
         theta_obs,
         c=y_obs,
         edgecolor="k",vmin=17,vmax=19)
 
-    cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
+cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
 
-    fig.colorbar(im, orientation="horizontal",cax=cax,label='n(HI) (cm-3)')
+fig.colorbar(im, orientation="horizontal",cax=cax,label='n(HI) (cm-3)')
 
 
-    pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
-    im=ax2.pcolor(
+pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
+im=ax2.pcolor(
         phi-np.pi,
         theta,
         (unc/q[1]).reshape((len(phi), len(theta))).T / np.log(10) ,#pred_unc,
         cmap='gray')
 
 
-    ax2.plot(
+ax2.plot(
         phi_obs-np.pi,
         theta_obs,
         'o',ms=7,mfc='none',mec='m')
 
-    cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
-    fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
+cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
+fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
 
 
-    ## I want this one to plot the fractional uncertainty!
-    phi_grid, theta_grid=np.meshgrid(phi,theta)
-    y_pred = griddata((phi_grid.flatten(),theta_grid.flatten()),q[1],(phi_obs,theta_obs))
-    residuals = (y_obs - y_pred)#/y_obs
+## I want this one to plot the fractional uncertainty!
+phi_grid, theta_grid=np.meshgrid(phi,theta)
+y_pred = griddata((phi_grid.flatten(),theta_grid.flatten()),q[1],(phi_obs,theta_obs))
+residuals = (y_obs - y_pred)#/y_obs
 
 
-    eee=ax3.scatter(
+eee=ax3.scatter(
         phi_obs-np.pi,
         theta_obs,
         c=residuals,
         edgecolor="k",cmap='PiYG',vmin=-0.3,vmax=0.3)
 
-    cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
-    fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in N(HI) estimate')
+cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
+fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in N(HI) estimate')
 
-    #####################################################################
+#####################################################################
 """
 ndim=4
 nbins=20
@@ -285,20 +296,29 @@ triangle.corner(data, bins=nbins, #labels=variable_names,
                       max_n_ticks=3,plot_contours=True,quantiles=quantiles,fig=fig,
                       show_titles=True,verbose=True,truths=truths,range=None)
 """
-    ## Plot histogram of results #########################################
-    bins=50
-    alpha=0.3
-    c0='C0'
-    c1='C1'
+## Plot histogram of results #########################################
+bins=50
+alpha=0.3
+c0='C0'
+c1='C1'
 
-    colors=['C0','C1','C2','C3']
+colors=['C0','C1','C2','C3']
 
-    fig=plt.figure(figsize=(8,8))
-    ax1 = fig.add_subplot(231)
-    ax2 = fig.add_subplot(232)
-    #ax3 = fig.add_subplot(233)
-    ax4 = fig.add_subplot(233)
-    #ax5 = fig.add_subplot(235)
+fig=plt.figure(figsize=(8,5))
+ax1 = fig.add_subplot(131)
+ax2 = fig.add_subplot(132)
+#ax3 = fig.add_subplot(233)
+ax4 = fig.add_subplot(133)
+#ax5 = fig.add_subplot(235)
+
+
+if run_loop:
+    ax1.hist(log_amp_array,bins=bins,alpha=alpha)
+    ax2.hist(log_avg_array,bins=bins,alpha=alpha)
+    ax4.hist(log_scale_array,bins=bins,alpha=alpha)
+
+
+else:
 
     for i in range(len(data.posterior.log_amp.values)):
         ax1.hist(data.posterior.log_amp.values[i],bins=bins,alpha=alpha,color=colors[i])
@@ -313,14 +333,14 @@ triangle.corner(data, bins=nbins, #labels=variable_names,
 #ax5.hist(data.posterior.log_c.values[1],bins=bins,alpha=alpha,color=c1)
 #ax5.set_xlabel('log constant')
 
-    ax1.set_xlabel('log amp')
-    ax4.set_xlabel('log avg')
-    ax2.set_xlabel('log scale')
+ax1.set_xlabel('log amp')
+ax4.set_xlabel('log avg')
+ax2.set_xlabel('log scale')
     #######################################################################
 
 
-    ## Save fit results to file ############################################
-    if False:
+## Save fit results to file ############################################
+if False:
         np.savetxt('NHI_column_map.txt',q[1])
         np.savetxt('NHI_column_fitted_stars.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
-    #######################################################################
+#######################################################################
