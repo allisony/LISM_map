@@ -103,8 +103,8 @@ ax1.grid(True)
 
 #########
 
-wave = np.arange(100,601,10)
-mask = (wave == 100) + (wave == 200) + (wave == 300) + (wave == 400) + (wave == 500) + (wave == 600)
+wave = np.arange(100,901,10)
+mask = (wave == 100) + (wave == 200) + (wave == 300) + (wave == 400) + (wave == 500) + (wave == 600) + (wave == 700) + (wave == 800) + (wave == 900)
 
 h1_col_mean_array = np.arange(17.4,19.2,0.2)
 h1_col_sig_array = np.logspace(-2,-0.3,10)#np.array([0.01,0.05,0.1,0.2,0.3,0.4,0.5])
@@ -162,13 +162,16 @@ for i in range(len(h1_col_mean_array)):
 
 
 
-fig = plt.figure(figsize=(12,9))
+fig = plt.figure(figsize=(12,12))
 ax1 = fig.add_subplot(231)
 ax2 = fig.add_subplot(232)
 ax3 = fig.add_subplot(233)
 ax4 = fig.add_subplot(234)
 ax5 = fig.add_subplot(235)
 ax6 = fig.add_subplot(236)
+ax7 = fig.add_subplot(237)
+ax8 = fig.add_subplot(238)
+ax9 = fig.add_subplot(239)
 
 
 #c=ax1.imshow(fractional_uncertainties_to_store[:,:,0].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
