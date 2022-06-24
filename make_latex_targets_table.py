@@ -15,9 +15,11 @@ for i in range(len(df)):
     df['N(HI)'].loc[i] = np.round(df['N(HI)'].loc[i], 2)
     df['N(HI) uncertainty'].loc[i] = np.round(df['N(HI) uncertainty'].loc[i], 2)
 
-
+## find unique references for easy numbering!
+reference_list = df['N(HI) source'].unique()
+df['N(HI) source numbers'] = 
 
 
 t2 = Table.from_pandas(df)
-t3 = t2['Star Name', 'RA', 'DEC', 'distance (pc)', 'N(HI)', 'N(HI) uncertainty', 'N(HI) source']
+t3 = t2['Star Name', 'RA', 'DEC', 'distance (pc)', 'N(HI)', 'N(HI) uncertainty', 'N(HI) source numbers']
 ascii.write(t3,format='latex')

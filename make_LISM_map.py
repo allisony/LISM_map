@@ -95,7 +95,8 @@ n_runs = 100
 
 if True:
 
-    mask = d <= 10
+    mask = d>10#(d>30) & (d <= 50)
+    filename_precursor = 'all_outside_10pc'
 
     y_obs = y_obs[mask]
     yerr = yerr[mask]
@@ -351,7 +352,6 @@ if True:
     table = az.summary(
         data, var_names=[v for v in data.posterior.data_vars if v != "pred"], stat_funcs=func_dict
          )
-    filename_precursor = '10pc'
     np.savetxt('NHI_column_map_'+filename_precursor +'.txt',np.transpose(q))
     np.savetxt('NHI_column_fitted_stars_' + filename_precursor + '.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
     table.to_csv('Bestfit_hyperparameters_' + filename_precursor + '.csv')
