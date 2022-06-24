@@ -163,15 +163,15 @@ for i in range(len(h1_col_mean_array)):
 
 
 fig = plt.figure(figsize=(12,12))
-ax1 = fig.add_subplot(231)
-ax2 = fig.add_subplot(232)
-ax3 = fig.add_subplot(233)
-ax4 = fig.add_subplot(234)
-ax5 = fig.add_subplot(235)
-ax6 = fig.add_subplot(236)
-ax7 = fig.add_subplot(237)
-ax8 = fig.add_subplot(238)
-ax9 = fig.add_subplot(239)
+ax1 = fig.add_subplot(331)
+ax2 = fig.add_subplot(332)
+ax3 = fig.add_subplot(333)
+ax4 = fig.add_subplot(334)
+ax5 = fig.add_subplot(335)
+ax6 = fig.add_subplot(336)
+ax7 = fig.add_subplot(337)
+ax8 = fig.add_subplot(338)
+ax9 = fig.add_subplot(339)
 
 
 #c=ax1.imshow(fractional_uncertainties_to_store[:,:,0].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
@@ -192,6 +192,9 @@ cs=ax3.contourf(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),vmin=
 ax4.contourf(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),vmin=0.01, vmax=1,levels=levels)
 ax5.contourf(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),vmin=0.01, vmax=1,levels=levels)
 ax6.contourf(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),vmin=0.01, vmax=1,levels=levels)
+ax7.contourf(xx,yy,fractional_uncertainties_to_store[:,:,6].transpose(),vmin=0.01, vmax=1,levels=levels)
+ax8.contourf(xx,yy,fractional_uncertainties_to_store[:,:,7].transpose(),vmin=0.01, vmax=1,levels=levels)
+ax9.contourf(xx,yy,fractional_uncertainties_to_store[:,:,8].transpose(),vmin=0.01, vmax=1,levels=levels)
 
 if False:
     ax1.contour(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=[0.35],color='k')
@@ -209,13 +212,14 @@ ax4.minorticks_on()
 ax5.minorticks_on()
 ax6.minorticks_on()
 
-ax4.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
-ax5.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
-ax6.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
+ax7.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
+ax8.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
+ax9.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
 
 
 ax1.set_ylabel('$\sigma_{N(HI)}$ (dex)',fontsize=18)
 ax4.set_ylabel('$\sigma_{N(HI)}$ (dex)',fontsize=18)
+ax7.set_ylabel('$\sigma_{N(HI)}$ (dex)',fontsize=18)
 
 ax1.set_title('100 \AA',fontsize=18)
 ax2.set_title('200 \AA',fontsize=18)
@@ -223,6 +227,9 @@ ax3.set_title('300 \AA',fontsize=18)
 ax4.set_title('400 \AA',fontsize=18)
 ax5.set_title('500 \AA',fontsize=18)
 ax6.set_title('600 \AA',fontsize=18)
+ax7.set_title('700 \AA',fontsize=18)
+ax8.set_title('800 \AA',fontsize=18)
+ax9.set_title('900 \AA',fontsize=18)
 
 ax1.set_xticks([17.5,18.,18.5,19])
 ax2.set_xticks([17.5,18.,18.5,19])
@@ -230,6 +237,9 @@ ax3.set_xticks([17.5,18.,18.5,19])
 ax4.set_xticks([17.5,18.,18.5,19])
 ax5.set_xticks([17.5,18.,18.5,19])
 ax6.set_xticks([17.5,18.,18.5,19])
+ax7.set_xticks([17.5,18.,18.5,19])
+ax8.set_xticks([17.5,18.,18.5,19])
+ax9.set_xticks([17.5,18.,18.5,19])
 
 fig.subplots_adjust(left=0.1,right=0.82,bottom=0.11,top=0.9)
 
