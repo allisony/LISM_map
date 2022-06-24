@@ -17,7 +17,12 @@ for i in range(len(df)):
 
 ## find unique references for easy numbering!
 reference_list = df['N(HI) source'].unique()
-df['N(HI) source numbers'] = 
+df['N(HI) source numbers'] = 0
+
+for i in range(len(reference_list)):
+   mask =  df['N(HI) source'] == reference_list[i]
+   df['N(HI) source numbers'][mask] = '[' + str(i+1) + ']'
+   print(reference_list[i], str(i+1))
 
 
 t2 = Table.from_pandas(df)
