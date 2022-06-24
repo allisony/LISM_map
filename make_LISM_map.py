@@ -91,7 +91,7 @@ yerr= df['N(HI) uncertainty'].values
 d = df['distance (pc)']
 
 run_loop = True
-n_runs = 10
+n_runs = 5
 
 if True:
 
@@ -169,23 +169,23 @@ if run_loop:
 
         ## set up NUTS ################################################
         nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
-            mcmc = MCMC(
+        mcmc = MCMC(
                     nuts_kernel,
                     num_warmup=1000,
                     num_samples=2000,
                     num_chains=2,
                     progress_bar=True,
                     )
-                    rng_key = jax.random.PRNGKey(34913)
+        rng_key = jax.random.PRNGKey(34913)
 
         mcmc.run(rng_key, X_obs, yerr, y=y_obs_samp)
         samples = mcmc.get_samples()
         pred = samples["pred"].block_until_ready()  # Blocking to get timing right
         data = az.from_numpyro(mcmc)
         q_array[i,:] = np.median(pred)
-        log_amp_array[i] = data.posterior.log_amp.values.reshape(4000) # should automate this = 2 * 2000 (num_samples * num_chains)
-        log_avg_array[i] = data.posterior.log_avg.values.reshape(4000)
-        log_scale_array[i] = data.posterior.log_scale.values.reshape(4000)
+        log_amp_array[i] = np.median(data.posterior.log_amp.values.reshape(4000)) # should automate this = 2 * 2000 (num_samples * num_chains)
+        log_avg_array[i] = np.median(data.posterior.log_avg.values.reshape(4000))
+        log_scale_array[i] = np.median(data.posterior.log_scale.values.reshape(4000))
 
         q = np.percentile(q_array, [15.9, 50, 84.1], axis=0)
 
@@ -194,7 +194,7 @@ else:
 
     ## set up NUTS ################################################
     nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
-        mcmc = MCMC(
+    mcmc = MCMC(
         nuts_kernel,
         num_warmup=1000,
         num_samples=2000,
