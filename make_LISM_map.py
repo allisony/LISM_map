@@ -131,8 +131,7 @@ plt.ylabel('N(HI)',fontsize=18)
 
 ## Define model to fit ################################
 def numpyro_model(X_obs, yerr, y=None): 
-    avg1 = numpyro.sample("log_avg", dist.Cauchy(18,2))
-
+    avg1 = numpyro.sample("log_avg", dist.Cauchy(18,2)) # do I need to change this?? it should be log?
     amp1 = numpyro.sample("log_amp", dist.Cauchy(0,10))
     scale1 = numpyro.sample("log_scale", dist.Normal(-1,0.5))
     #sigma1 = numpyro.sample("sigma", dist.HalfNormal(0.2))
