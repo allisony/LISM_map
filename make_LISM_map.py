@@ -90,8 +90,8 @@ yerr= df['N(HI) uncertainty'].values
 
 d = df['distance (pc)']
 
-run_loop = True
-n_runs = 5
+run_loop = False
+n_runs = 100
 
 if True:
 
@@ -155,7 +155,7 @@ def numpyro_model(X_obs, yerr, y=None):
 
 if run_loop:
 
-    q_array = np.zeros((n_runs,len(phi)))
+    q_array = np.zeros((n_runs,int(len(phi)*len(theta))))
 
     log_amp_array = np.zeros(n_runs)
     log_avg_array = log_amp_array.copy()
@@ -164,6 +164,8 @@ if run_loop:
     
 
     for i in range(n_runs):
+
+        print(i, n_runs)
 
         y_obs_samp = np.random.normal(loc=y_obs, scale=yerr)
 
@@ -182,12 +184,12 @@ if run_loop:
         samples = mcmc.get_samples()
         pred = samples["pred"].block_until_ready()  # Blocking to get timing right
         data = az.from_numpyro(mcmc)
-        q_array[i,:] = np.median(pred)
+        q_array[i,:] = np.median(pred,axis=0)
         log_amp_array[i] = np.median(data.posterior.log_amp.values.reshape(4000)) # should automate this = 2 * 2000 (num_samples * num_chains)
         log_avg_array[i] = np.median(data.posterior.log_avg.values.reshape(4000))
         log_scale_array[i] = np.median(data.posterior.log_scale.values.reshape(4000))
 
-        q = np.percentile(q_array, [15.9, 50, 84.1], axis=0)
+    q = np.percentile(q_array, [15.9, 50, 84.1], axis=0)
 
 else:
 
@@ -340,7 +342,17 @@ ax2.set_xlabel('log scale')
 
 
 ## Save fit results to file ############################################
-if False:
-        np.savetxt('NHI_column_map.txt',q[1])
-        np.savetxt('NHI_column_fitted_stars.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
+if True:
+    func_dict = {
+    "15.9%": lambda x: np.percentile(x, 15.9),
+    "median": lambda x: np.percentile(x, 50),
+    "84.1%": lambda x: np.percentile(x, 84.1),
+    }
+    table = az.summary(
+        data, var_names=[v for v in data.posterior.data_vars if v != "pred"], stat_funcs=func_dict
+         )
+    filename_precursor = '10pc'
+    np.savetxt('NHI_column_map_'+filename_precursor +'.txt',np.transpose(q))
+    np.savetxt('NHI_column_fitted_stars_' + filename_precursor + '.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
+    table.to_csv('Bestfit_hyperparameters_' + filename_precursor + '.csv')
 #######################################################################
