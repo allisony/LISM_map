@@ -190,6 +190,6 @@ for i in range(len(file_prefixes)):
 cax=fig.add_axes([0.11, 0.06, 0.78, 0.02])
 
 cb=fig.colorbar(im, orientation="horizontal",cax=cax)
-cb.set_label(label='log$_{10}$ N(HI)',size=20)
+cb.set_label(label='log$_{10}$[N(HI)/cm$^{-2}$]',size=20)
 
 #plt.savefig('NHI_map.png')
