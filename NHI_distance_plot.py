@@ -34,7 +34,7 @@ ax2 = fig.add_subplot(122)
 ax.errorbar(df['distance (pc)'], df['N(HI)'], xerr=df['distance error'], yerr=df['N(HI) uncertainty'], fmt='o', color='dodgerblue', ecolor='k', mec='k')
 
 ax.set_xlabel('Distance (pc)', fontsize=fs)
-ax.set_ylabel('log$_{10}$ N(HI) (cm$^{-2}$)', fontsize=fs)
+ax.set_ylabel('log$_{10}$[N(HI)/cm$^{-2}$]', fontsize=fs)
 ax.set_xscale('log')
 
 ax.minorticks_on()
