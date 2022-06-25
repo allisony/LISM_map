@@ -211,6 +211,9 @@ ax3.minorticks_on()
 ax4.minorticks_on()
 ax5.minorticks_on()
 ax6.minorticks_on()
+ax7.minorticks_on()
+ax8.minorticks_on()
+ax9.minorticks_on()
 
 ax7.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
 ax8.set_xlabel('log$_{10}$ N(HI) (dex)',fontsize=18)
@@ -241,7 +244,7 @@ ax7.set_xticks([17.5,18.,18.5,19])
 ax8.set_xticks([17.5,18.,18.5,19])
 ax9.set_xticks([17.5,18.,18.5,19])
 
-fig.subplots_adjust(left=0.1,right=0.82,bottom=0.11,top=0.9)
+fig.subplots_adjust(left=0.1,right=0.82,bottom=0.11,top=0.9, hspace=0.3)
 
 cax = plt.axes([0.85, 0.11, 0.03, 0.79]) # left, bottom, width, top
 cbar = fig.colorbar(cs, cax=cax, ticks=levels,drawedges=True) #also cs.levels
