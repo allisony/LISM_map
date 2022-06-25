@@ -116,7 +116,7 @@ ax9 = fig.add_subplot(339)
 #ax3.imshow(fractional_uncertainties_to_store[:,:,2].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
 #                              extent=[np.min(h1_col_mean_array),np.max(h1_col_mean_array),np.min(h1_col_sig_array),np.max(h1_col_sig_array)])
 
-levels=[0.0001,0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1e25]
+levels=[0.0001,0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,10,1e35]
 
 nlevels=20
 
@@ -188,7 +188,7 @@ fig.subplots_adjust(left=0.1,right=0.82,bottom=0.11,top=0.9, hspace=0.3)
 
 cax = plt.axes([0.85, 0.11, 0.03, 0.79]) # left, bottom, width, top
 cbar = fig.colorbar(cs, cax=cax, ticks=levels,drawedges=True) #also cs.levels
-cbar.set_ticklabels([' ', '0.01', '0.05','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9','1',' '])
+cbar.set_ticklabels([' ', '0.01', '0.05','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9','1','10',' '])
 cbar.set_label('Fractional uncertainty',fontsize=18)
 
 
