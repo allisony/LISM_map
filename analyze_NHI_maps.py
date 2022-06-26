@@ -153,7 +153,7 @@ for i in range(len(file_prefixes)):
         -phi_obs+np.pi,
         theta_obs,
         c=y_obs,
-        edgecolor="k",vmin=17.5,vmax=19,marker='*')
+        edgecolor="k",vmin=17.5,vmax=19,marker='*',s=12,edgecolors='w')
 
     CS=axes_list[i].contour(-phi+np.pi,
         theta,
@@ -192,4 +192,6 @@ cax=fig.add_axes([0.11, 0.06, 0.78, 0.02])
 cb=fig.colorbar(im, orientation="horizontal",cax=cax)
 cb.set_label(label='log$_{10}$[N(HI)/cm$^{-2}$]',size=20)
 
+
+fig.subplots_adjust(top=0.97,right=0.98,left=0.05)
 #plt.savefig('NHI_map.png')
