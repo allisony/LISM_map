@@ -153,7 +153,7 @@ for i in range(len(file_prefixes)):
         -phi_obs+np.pi,
         theta_obs,
         c=y_obs,
-        edgecolor="k",vmin=17.5,vmax=19,marker='*',s=12,edgecolors='w')
+        edgecolor="k",vmin=17.5,vmax=19,marker='*',s=75,edgecolors='w')
 
     CS=axes_list[i].contour(-phi+np.pi,
         theta,
