@@ -14,7 +14,7 @@ plt.ion()
 
 cloud_list = glob.glob('/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE/Redfield_ISM_cloud_boundaries_l_b/*.csv')
 
-galactic = True
+galactic = False
 cmap = cm.get_cmap('plasma', len(cloud_list))
 
 number_mid_pts = 10
@@ -113,7 +113,7 @@ ax = fig.add_subplot(111, projection=projection)
 
 
 for k,fn in enumerate(cloud_list):
-  #if k<5:
+  if cloud_list[k].split('/')[-1].replace('_l_b.csv','') == 'Blue':
 
 
     df = pd.read_csv(fn)
@@ -147,10 +147,11 @@ for k,fn in enumerate(cloud_list):
 
 
 
-
-    #ax.plot(df['l'],-1*df['b'],color=cmap(k),label = cloud_list[k].split('/')[-1].replace('_l_b.csv',''),transform=projection)
+    if galactic:
+        ax.plot(df['l'],-1*df['b'],color=cmap(k),label = cloud_list[k].split('/')[-1].replace('_l_b.csv',''),transform=projection)
     #ax.plot(pd.Series(l,name='l'),pd.Series(b,name='b'),color=cmap(k),label = cloud_list[k].split('/')[-1].replace('_l_b.csv',''),transform=projection)
-    ax.plot(ra,dec,color=cmap(k),label = cloud_list[k].split('/')[-1].replace('_l_b.csv',''),transform=projection, marker='o',markersize=5,linestyle='None')
+    else:
+        ax.plot(ra,dec,color=cmap(k),label = cloud_list[k].split('/')[-1].replace('_l_b.csv','').replace('_',' '),transform=projection, marker='o',markersize=5,linestyle='None')
         
     #ra_new, dec_new = interpolate_cloud(ra*np.pi/180., dec*np.pi/180, number_mid_pts)
     #ra_new = coord.Angle(ra_new, unit=u.radian)

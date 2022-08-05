@@ -5,7 +5,6 @@ from scipy.interpolate import griddata
 import astropy.units as u
 import astropy.coordinates as coord
 
-
 plt.ion()
 
 from matplotlib import rc
@@ -27,106 +26,23 @@ phi = np.linspace(0, 2.*np.pi, 200)
 theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
 phi_grid, theta_grid=np.meshgrid(phi,theta)
 
-if False:
- for i in range(len(file_prefixes)):
-
-    df = pd.read_csv('Bestfit_hyperparameters_' + file_prefixes[i] + '.csv')
-
-    stars = np.loadtxt('NHI_column_fitted_stars_' + file_prefixes[i] + '.txt')
-
-    NHI = np.loadtxt('NHI_column_map_' + file_prefixes[i] + '.txt')
-
-    q = NHI.transpose()
-    unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
-
-    phi_obs = stars[:,0]
-    theta_obs = stars[:,1]
-    y_obs = stars[:,2]
-
-    print(file_prefixes[i], len(stars))
-
-    for j in range(len(params)):
-        print(params[j],np.exp(df['median'].loc[j]), np.exp(df['84.1%'].loc[j])-np.exp(df['median'].loc[j]), np.exp(df['median'].loc[j])-np.exp(df['15.9%'].loc[j]))
-
-
-    fig=plt.figure(figsize=(24,6))
-    ax1=fig.add_subplot(121,projection='mollweide')
-    ax2=fig.add_subplot(122,projection='mollweide')
-
-    im=ax1.pcolor(
-        -phi+np.pi,
-        theta,
-        q[1].reshape((len(phi), len(theta))).T,
-        vmin=17,vmax=19)
-
-    ax1.scatter(
-        -phi_obs+np.pi,
-        theta_obs,
-        c=y_obs,
-        edgecolor="k",vmin=17,vmax=19,marker='*')
-
-    CS=ax1.contour(-phi+np.pi,
-        theta,
-        q[1].reshape((len(phi), len(theta))).T,
-        levels=[17.0, 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 18.0,18.1, 18.2,18.3, 18.4,18.5,18.6,18.7,18.8, 18.9,19.0],colors='k')
-
-    ax1.clabel(CS, CS.levels, inline=True, fontsize=10)
-
-    #ax1.set_xticklabels(['','','90','','','0','','','270','',''])
-    ax1.set_xticklabels([])
-    ax1.text(-90*np.pi/180., 75*np.pi/180., '90$^{\circ}$',ha='center')
-    ax1.text(0, 75*np.pi/180., '0$^{\circ}$',ha='center')
-    ax1.text(90*np.pi/180., 75*np.pi/180., '270$^{\circ}$',ha='center')
-    ax1.text(180*np.pi/180., 75*np.pi/180., '180$^{\circ}$',ha='center')
-    ax1.text(-180*np.pi/180., 75*np.pi/180., '180$^{\circ}$',ha='center')
-
-
-    ax1.set_title(file_prefixes[i])
-    ax1.grid(True)
-
-    cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
-
-    fig.colorbar(im, orientation="horizontal",cax=cax,label='log10 N(HI) (cm-2)')
-
-    pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
-    im=ax2.pcolor(
-        -(phi-np.pi),
-        theta,
-        (unc/q[1]).reshape((len(phi), len(theta))).T / np.log(10) ,#pred_unc,
-        cmap='gray')
-
-
-    ax2.plot(
-        -(phi_obs-np.pi),
-        theta_obs,
-        'o',ms=7,mfc='none',mec='m')
-
-    cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
-    fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
-
-    #import pdb; pdb.set_trace()
-
-
-
-## figure for paper
-
 
 
 fig=plt.figure(figsize=(15,12))
-ax1=fig.add_subplot(321,projection='mollweide')
-ax2=fig.add_subplot(322,projection='mollweide')
-ax3=fig.add_subplot(323,projection='mollweide')
-ax4=fig.add_subplot(324,projection='mollweide')
-ax5=fig.add_subplot(325,projection='mollweide')
-ax6=fig.add_subplot(326,projection='mollweide')
+ax1=fig.add_subplot(321)
+ax2=fig.add_subplot(322)
+ax3=fig.add_subplot(323)
+ax4=fig.add_subplot(324)
+ax5=fig.add_subplot(325)
+ax6=fig.add_subplot(326)
 
 axes_list = [ax1, ax2, ax3, ax4, ax5, ax6]
 
 
 cloud_path = '/Users/aayoungb/MyPapers/Proposals/Missions/ESCAPE/Redfield_ISM_cloud_boundaries_ra_dec/'
-cloud_name = 'Blue'
+cloud_name = 'Gem'
 df_cloud = pd.read_csv(cloud_path + cloud_name + '_ra_dec.csv')
-fig.text(0.5,0.95,cloud_name.replace('_',''),fontsize=22)
+fig.text(0.5,0.95,cloud_name,fontsize=22)
 
 file_prefixes = ['10pc','10_20pc','20_30pc','30_50pc','50_100pc','all_outside_10pc']
 titles = ['$<$10 pc','10-20 pc','20-30 pc','30-50 pc','50-100 pc','10-100 pc']

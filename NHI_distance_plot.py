@@ -31,7 +31,11 @@ fig = plt.figure(figsize=(12,5))
 ax = fig.add_subplot(121)
 ax2 = fig.add_subplot(122)
 
-ax.errorbar(df['distance (pc)'], df['N(HI)'], xerr=df['distance error'], yerr=df['N(HI) uncertainty'], fmt='o', color='dodgerblue', ecolor='k', mec='k')
+mask1 = df['RA'] >0 #(df['RA'] < 180.) & (df['DEC'] > 0)
+
+ax.errorbar(df['distance (pc)'][mask1], df['N(HI)'][mask1], xerr=df['distance error'][mask1], yerr=df['N(HI) uncertainty'][mask1], fmt='o', color='dodgerblue', ecolor='k', mec='k')
+
+print(np.mean(df['N(HI)'][mask1]), np.std(df['N(HI)'][mask1]))
 
 ax.set_xlabel('Distance (pc)', fontsize=fs)
 ax.set_ylabel('log$_{10}$[N(HI)/cm$^{-2}$]', fontsize=fs)
@@ -81,4 +85,4 @@ ax2.set_xscale('log')
 ###############
 
 fig.subplots_adjust(left=0.08, right=0.97, top=0.97, bottom=0.13, wspace=0.25)
-plt.savefig('NHI_distance.png')
+#plt.savefig('NHI_distance.png')
