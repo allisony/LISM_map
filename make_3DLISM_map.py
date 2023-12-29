@@ -45,13 +45,13 @@ rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
 
 
 ## Define Haversine distance class for use with tinygp ##################
-class GreatCircleDistance(kernels.stationary.Distance):
-    def distance(self, X1, X2):
-        if jnp.shape(X1) != (3,) or jnp.shape(X2) != (3,):
-            raise ValueError(
-                "The great-circle distance is only defined for unit 3-vector"
-            )
-        return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
+#class GreatCircleDistance(kernels.stationary.Distance):
+#    def distance(self, X1, X2):
+#        if jnp.shape(X1) != (3,) or jnp.shape(X2) != (3,):
+#            raise ValueError(
+#                "The great-circle distance is only defined for unit 3-vector"
+#            )
+#        return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
 ##############################################################################
 
 
@@ -59,25 +59,34 @@ class GreatCircleDistance(kernels.stationary.Distance):
 df = pd.read_csv('NHI_data.csv')
 ####################################################
 
-## Make a spherical grid#############################
-phi = np.linspace(0, 2.*np.pi, 200)
-theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
-phi_grid, theta_grid = np.meshgrid(phi, theta, indexing="ij")
+
+## Make a spherical-polar grid and convert to cartesian coords#############################
+phi = np.linspace(0, 2.*np.pi, 50) # unit: radian
+theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 50) # unit: radian
+distance = np.linspace(0, 100, 50) # unit: pc
+phi_grid, theta_grid, distance_grid = np.meshgrid(phi, theta, distance, indexing="ij")
 phi_grid = phi_grid.flatten()
 theta_grid = theta_grid.flatten()
+distance_grid = distance_grid.flatten()
 X_grid = np.vstack(
     (
-        np.cos(phi_grid) * np.cos(theta_grid),
-        np.sin(phi_grid) * np.cos(theta_grid),
-        np.sin(theta_grid),
+        distance_grid*np.cos(phi_grid) * np.cos(theta_grid),
+        distance_grid*np.sin(phi_grid) * np.cos(theta_grid),
+        distance_grid*np.sin(theta_grid),
     )
 ).T
 
-X_grid_RADec = np.vstack((phi_grid,theta_grid))
+#X_grid_RADec = np.vstack((phi_grid,theta_grid))
 ####################################################
 
+
+## plot for sanity check
+#fig = plt.figure()
+#ax = fig.add_subplot(projection='3d')
+#ax.scatter(X_grid[:,0],X_grid[:,1],X_grid[:,2],'o')
+
 ## Put star coordinates on that grid ###############
-skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree)
+skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree) ## ADD DISTANCE HERE!
 X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
 theta_obs = df['DEC'].values * np.pi/180. 
 phi_obs  = df['RA'].values * np.pi/180.
