@@ -84,9 +84,9 @@ X_grid = np.vstack(
 #fig = plt.figure()
 #ax = fig.add_subplot(projection='3d')
 #ax.scatter(X_grid[:,0],X_grid[:,1],X_grid[:,2],'o')
-
+#ax.scatter(X_obs[:,0],X_obs[:,1],X_obs[:,2],'o')
 ## Put star coordinates on that grid ###############
-skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree) ## ADD DISTANCE HERE!
+skycoords = SkyCoord(df['RA'] * u.degree,df['DEC'] * u.degree, df['distance (pc)'] * u.pc, frame='icrs')
 X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
 theta_obs = df['DEC'].values * np.pi/180. 
 phi_obs  = df['RA'].values * np.pi/180.
