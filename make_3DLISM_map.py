@@ -1,133 +1,232 @@
 import numpy as np
 import matplotlib.pyplot as plt   
-from matplotlib import rc, rcParams
 import pandas as pd
-from astropy.modeling.models import Voigt1D
-from scipy.interpolate import griddata
-from matplotlib.collections import LineCollection
-from scipy.ndimage import gaussian_filter
-from scipy import misc
-import numpy as np
-import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 from tinygp import kernels, GaussianProcess
 from jax.config import config
 import jaxopt
-import pandas as pd
-from astropy.coordinates import SkyCoord
-import astropy.units as u
 import numpyro
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
 import arviz as az
-import corner as triangle
-from scipy.interpolate import griddata
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+from astropy.coordinates import spherical_to_cartesian
+
+plt.ion()
+
 
 config.update("jax_enable_x64", True)
 pd.options.mode.chained_assignment = None
 
 
-## Pretty plot setup ###################################
-plt.ion()
 
-rc('font',**{'family':'sans-serif'})
-rc('text', usetex=True)
-
-label_size = 16
-rcParams['xtick.labelsize'] = label_size 
-rcParams['ytick.labelsize'] = label_size
-
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-rc('text', usetex=True)
-rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
+## Create fake data to model ### The column densities / HI distribution is set up later
+nstars = 100
+ls = np.random.uniform(0, 360, nstars) # Galactic l in degrees
+bs = np.random.uniform(-90, 90, nstars) # Galactic b in degrees
+ds = np.random.lognormal(2.3, 0.5, nstars)  # distance in pc
+ds[ds > 40] = 39. # impose 40 pc maximum for simplicity
+skycoords = SkyCoord(ls * u.degree,bs * u.degree,ds * u.pc, frame='galactic')
 ####################################################
 
+#############################
+# Initialize or read in the big grid where each cell knows its cartesian
+# and spherical polar coordinates
+# From Dustribution
+#############################
 
-## Define Haversine distance class for use with tinygp ##################
-#class GreatCircleDistance(kernels.stationary.Distance):
-#    def distance(self, X1, X2):
-#        if jnp.shape(X1) != (3,) or jnp.shape(X2) != (3,):
-#            raise ValueError(
-#                "The great-circle distance is only defined for unit 3-vector"
-#            )
-#        return jnp.arctan2(jnp.linalg.norm(jnp.cross(X1, X2)), (X1.T @ X2))
-##############################################################################
+#Copied from Dustribution - A spherical polar coords grid which also knows about its corresponding cartesian coords
+def threeD_grid(l_lower, l_upper, n_l, b_lower, b_upper, n_b, d_min, d_max, n_d):  
 
 
-## Read in the data -- see format_spreadsheet.py ###
-df = pd.read_csv('NHI_data.csv')
-####################################################
+    #Gives boundaries of l,b,d grid cells
+    l_bounds = np.linspace(l_lower, l_upper, n_l+1) #+1: Need one more bound than the number of cells to get the last bound
+    b_bounds = np.rad2deg(np.arcsin(np.linspace(np.sin(np.deg2rad(b_lower)), np.sin(np.deg2rad(b_upper)), n_b+1)))
+    #d_bounds = np.logspace(np.log10(d_min), np.log10(d_max), n_d+1) #dist in pc and logspacing
+    d_bounds = np.linspace(d_min, d_max, n_d+1) #dist in pc and linear spacing
+
+    rows = []
 
 
-## Make a spherical-polar grid and convert to cartesian coords#############################
-phi = np.linspace(0, 2.*np.pi, 50) # unit: radian
-theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 50) # unit: radian
-distance = np.linspace(0, 100, 50) # unit: pc
-phi_grid, theta_grid, distance_grid = np.meshgrid(phi, theta, distance, indexing="ij")
-phi_grid = phi_grid.flatten()
-theta_grid = theta_grid.flatten()
-distance_grid = distance_grid.flatten()
-X_grid = np.vstack(
-    (
-        distance_grid*np.cos(phi_grid) * np.cos(theta_grid),
-        distance_grid*np.sin(phi_grid) * np.cos(theta_grid),
-        distance_grid*np.sin(theta_grid),
-    )
-).T
+    for i in range(len(l_bounds)-1): #-1 to remove the last bound element so that we don't do i+1 on last element since there is no +1
+        for j in range(len(b_bounds)-1):
+            for k in range(len(d_bounds)-1):
 
-#X_grid_RADec = np.vstack((phi_grid,theta_grid))
-####################################################
+                if (i%10 == 0) & (j%10 == 0) & (k%10 == 0):
+                    print(i,j,k)
 
+                #Calc mid points of grid cells for the spherical polar coords
+                l_mid = (l_bounds[i] + l_bounds[i+1])/2
+                b_mid = (b_bounds[j] + b_bounds[j+1])/2
+                #d_mid = 10**( ( np.log10(d_bounds[k]) + np.log10(d_bounds[k+1]) )/2 ) #log spacing distance
+                d_mid = (d_bounds[k] + d_bounds[k+1])/2 #linear spaced distance
+                
 
-## plot for sanity check
-#fig = plt.figure()
-#ax = fig.add_subplot(projection='3d')
-#ax.scatter(X_grid[:,0],X_grid[:,1],X_grid[:,2],'o')
-#ax.scatter(X_obs[:,0],X_obs[:,1],X_obs[:,2],'o')
-## Put star coordinates on that grid ###############
-skycoords = SkyCoord(df['RA'] * u.degree,df['DEC'] * u.degree, df['distance (pc)'] * u.pc, frame='icrs')
-X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
-theta_obs = df['DEC'].values * np.pi/180. 
-phi_obs  = df['RA'].values * np.pi/180.
-####################################################
+                #Calc mid points in Cart coords - required to place blob and fill density
+                #Need to give the input as dist, lat, long (d,b,l)
+                x_mid, y_mid, z_mid = spherical_to_cartesian(d_mid, np.deg2rad(b_mid), np.deg2rad(l_mid)) 
 
 
-## Set up data to fit ##############################
-y_obs = df['N(HI)'].values
-yerr= df['N(HI) uncertainty'].values
+                rows.append([l_mid, b_mid, d_mid, x_mid, y_mid, z_mid]) 
 
-d = df['distance (pc)']
+    
 
-run_loop = False
-n_runs = 100
-
-if True:
-
-    mask = d>10#(d>30) & (d <= 50)
-    filename_precursor = 'all_outside_10pc'
-
-    y_obs = y_obs[mask]
-    yerr = yerr[mask]
-    theta_obs = theta_obs[mask]
-    phi_obs = phi_obs[mask]
-    X_obs = X_obs[mask]
-    d = d[mask]
+    threeDGrid = pd.DataFrame(rows, columns=["pol_l", "pol_b", "pol_d", "cart_x", "cart_y", "cart_z"], dtype="float")
 
 
+    return l_bounds, b_bounds, d_bounds, threeDGrid 
+
+
+
+
+
+initialize_grid = False # will need to be set to True the first time you run it
+
+if initialize_grid:
+
+    l_lower=0
+    l_upper=359.9
+    n_l=100
+    b_lower=-90
+    b_upper=90
+    n_b=100
+    d_min=0
+    d_max=40
+    n_d=40
+
+
+    l_bounds, b_bounds, d_bounds, threeDGrid = \
+            threeD_grid(l_lower, l_upper, n_l, b_lower, b_upper, n_b, d_min, d_max, n_d)
+    threeDGrid.to_pickle("threeDGrid.pkl")
+    np.save("l_bounds.pkl",l_bounds, allow_pickle=True)
+    np.save("b_bounds.pkl",b_bounds, allow_pickle=True)
+    np.save("d_bounds.pkl",d_bounds, allow_pickle=True)
+
+else:
+
+    threeDGrid = pd.read_pickle("threeDGrid.pkl")
+    l_bounds=np.load("l_bounds.pkl.npy", allow_pickle=True)
+    b_bounds=np.load("b_bounds.pkl.npy", allow_pickle=True)
+    d_bounds=np.load("d_bounds.pkl.npy", allow_pickle=True)
+##################################
+
+
+##################################
+# Populate the grid with some clouds
+###################################
+
+def spheroid_calculation(x_array, y_array, z_array, cloud_dic): 
+    # this calculates the distance of each grid point from the spheroid's center. The boundaries
+    # of the spheroid are at 1
+    # need to update this description, it's not 100% correct
+
+    dist_from_spheroid_center = np.sqrt( ( (x_array - cloud_dic["x_center"]) / cloud_dic["x_scale"] )**2 + \
+            ( (y_array - cloud_dic["y_center"]) / cloud_dic["y_scale"] )**2 + \
+            ( (z_array - cloud_dic["z_center"]) / cloud_dic["z_scale"] )**2
+                   )
+
+    return dist_from_spheroid_center
+
+
+# Let's have two uniform density spheroids units: pc] 
+## Cloud 1 properties
+cloud1 = {"x_scale":20, 
+          "y_scale":18,
+          "z_scale":70,
+          "x_center":-8, 
+          "y_center":8,
+          "z_center":10,
+          "density":0.04}
+
+## Cloud 2 properties
+cloud2 = {"x_scale":10, 
+          "y_scale":50,
+          "z_scale":20,
+          "x_center":5,
+          "y_center":-10,
+          "z_center":-15,
+          "density":0.08}
+
+# Calculate the distance of each grid point from the spheroid center
+dist1 = spheroid_calculation(threeDGrid['cart_x'],threeDGrid['cart_y'],threeDGrid['cart_z'],cloud1)
+dist2 = spheroid_calculation(threeDGrid['cart_x'],threeDGrid['cart_y'],threeDGrid['cart_z'],cloud2)
+
+threeDGrid['density'] = 0 # initialize the density grid
+threeDGrid['density'][(dist1 < 1)] += cloud1["density"] # if grid point is inside cloud, add that cloud's density
+threeDGrid['density'][(dist2 < 1)] += cloud2["density"] # same for cloud 2
+
+
+# plot to see how it looks in 3D space
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(threeDGrid['cart_x'][threeDGrid['density'] > 0], threeDGrid['cart_y'][threeDGrid['density'] > 0], threeDGrid['cart_z'][threeDGrid['density'] > 0], c=threeDGrid['density'][threeDGrid['density'] >0], marker='.', alpha=0.2)
+
+################################
+# Integrate the grid to get column densities
+# From Dustribution
+################################
+
+# find where the stars are on the grid (from Dustribution)
+l_ind = np.zeros_like(skycoords,dtype=int)
+b_ind = l_ind.copy()
+d_ind = l_ind.copy()
+for i in range(len(skycoords)):
+
+    l_ind[i] = np.argwhere(l_bounds < skycoords[i].l.value)[-1][0]
+    b_ind[i] = np.argwhere(b_bounds < skycoords[i].b.value)[-1][0]
+    d_ind[i] = np.argwhere(d_bounds < skycoords[i].distance.value)[-1][0]
+#
+
+## from Dustribution, modified
+def integAllSource(source_dists, source_l, source_b, l_bounds, b_bounds, d_bounds, l_ind, b_ind, d_ind, density_samples):
+
+    density_grid = density_samples.reshape(len(l_bounds)-1,len(b_bounds)-1,len(d_bounds)-1)
+    integral_grid = jnp.cumsum(density_grid * (d_bounds[1:] - d_bounds[:-1]), axis=2) * 3.09e18 #3.09e18 cm/pc
+
+    column_densities = jnp.zeros(len(skycoords))
+    for i in range(len(column_densities)):
+
+
+        column_densities=column_densities.at[i].set(integral_grid[l_ind[i],b_ind[i],d_ind[i]] + \
+            ((integral_grid[l_ind[i],b_ind[i],d_ind[i]+1] - integral_grid[l_ind[i],b_ind[i],d_ind[i]]) * \
+            (skycoords[i].distance.value - d_bounds[d_ind[i]])) )
+
+    return column_densities
+
+# calculate column densities of the sources
+column_densities = integAllSource(jnp.array(skycoords.distance), jnp.array(skycoords.l), jnp.array(skycoords.b), l_bounds, b_bounds, d_bounds, l_ind, b_ind, d_ind, jnp.array(threeDGrid['density']))
+
+
+
+#############################################
+## Set up data to fit 
+###########################################
+y_truth = np.log10(column_densities) # log N(HI), units: dex
+y_obs = y_truth + \
+        np.random.normal(loc=0, scale=0.1, size=len(column_densities)) # add some random noise
+yerr= 0.1 * np.ones_like(y_obs) # units: dex
+
+X_obs_lbd = np.array([ls,bs,ds]).T
+X_obs_cartesian = np.array([skycoords.cartesian.x, 
+                        skycoords.cartesian.y, skycoords.cartesian.z]).T
+
+X_grid = np.array([threeDGrid['cart_x'], threeDGrid['cart_y'], threeDGrid['cart_z']]).T
 ####################################################
 
 ## Plot the data ####################################
 fig=plt.figure()
 ax=fig.add_subplot(111,projection='mollweide')
-ax.scatter(
-    phi_obs-np.pi,
-    theta_obs,
+c=ax.scatter(
+    skycoords.l.radian-np.pi,
+    skycoords.b.radian,
     c=y_obs,
-    edgecolor="k",vmin=17.0,vmax=19.0)
-ax.set_xlabel(r"$\phi$")
-ax.set_ylabel(r"$\theta$")
-_ = ax.set_title("data")
+    edgecolor="k",vmin=17.5,vmax=19.0)
+ax.set_xlabel("l")
+ax.set_ylabel("b")
+ax.set_title("log10 N(HI) data")
+plt.colorbar(c)
 
 plt.figure()
 plt.errorbar(d,y_obs,yerr=yerr,fmt='ko')
@@ -135,24 +234,30 @@ plt.xlabel('Distance (pc)',fontsize=18)
 plt.ylabel('N(HI)',fontsize=18)
 #######################################################
 
-#import pdb; pdb.set_trace()
 
 
 ## Define model to fit ################################
 def numpyro_model(X_obs, yerr, y=None): 
-    avg1 = numpyro.sample("log_avg", dist.Cauchy(18,2)) # do I need to change this?? it should be log?
-    amp1 = numpyro.sample("log_amp", dist.Cauchy(0,10))
-    scale1 = numpyro.sample("log_scale", dist.Normal(-1,0.5))
-    #sigma1 = numpyro.sample("sigma", dist.HalfNormal(0.2))
-    #c1 = numpyro.sample("log_c",dist.Normal(0,10))
+    avg = numpyro.sample("log10_avg", dist.Cauchy(-1,0.5)) # log10 of the average number density (cm^{-3})
+    amp = numpyro.sample("log_amp", dist.Cauchy(0,10)) # ln(amplitude) 
+    length_scale1 = numpyro.sample("log_lengthscale1", dist.Normal(-1,0.5))
+    length_scale2 = numpyro.sample("log_lengthscale2", dist.Normal(-1,0.5))
+    length_scale3 = numpyro.sample("log_lengthscale3", dist.Normal(-1,0.5))
 
-    kernel = jnp.exp(amp1) * kernels.Exp(jnp.exp(scale1), distance=GreatCircleDistance()) #+ kernels.Constant(jnp.exp(c1))
+    log10_density = jnp.exp(amp) * kernels.ExpSquared(
+                        jnp.array([jnp.power(10,length_scale1),jnp.power(10,length_scale2),
+                        jnp.power(10,length_scale3)])  ) # model of the number density (cm^{-3})
 
+
+    density = jnp.power(10,log10_density)
+
+    column_densities = integAllSource(jnp.array(skycoords.distance), jnp.array(skycoords.l), jnp.array(skycoords.b), l_bounds, b_bounds, d_bounds, l_ind, b_ind, d_ind, density)
+    
     gp=GaussianProcess(
-        kernel,
+        column_densities,
         X_obs,
-        diag=yerr**2, #+ (sigma1 * jnp.log(10) * y)**2, 
-        mean=jnp.exp(avg1))
+        diag=yerr**2, 
+        mean=jnp.exp(avg) )
 
 
     numpyro.sample("gp", gp.numpyro_dist(), obs=y)
@@ -162,205 +267,30 @@ def numpyro_model(X_obs, yerr, y=None):
 #######################################################
 
 
-if run_loop:
-
-    q_array = np.zeros((n_runs,int(len(phi)*len(theta))))
-
-    log_amp_array = np.zeros(n_runs)
-    log_avg_array = log_amp_array.copy()
-    log_scale_array = log_amp_array.copy()
-
-    
-
-    for i in range(n_runs):
-
-        print(i, n_runs)
-
-        y_obs_samp = np.random.normal(loc=y_obs, scale=yerr)
-
-        ## set up NUTS ################################################
-        nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
-        mcmc = MCMC(
-                    nuts_kernel,
-                    num_warmup=1000,
-                    num_samples=2000,
-                    num_chains=2,
-                    progress_bar=True,
-                    )
-        rng_key = jax.random.PRNGKey(34913)
-
-        mcmc.run(rng_key, X_obs, yerr, y=y_obs_samp)
-        samples = mcmc.get_samples()
-        pred = samples["pred"].block_until_ready()  # Blocking to get timing right
-        data = az.from_numpyro(mcmc)
-        q_array[i,:] = np.median(pred,axis=0)
-        log_amp_array[i] = np.median(data.posterior.log_amp.values.reshape(4000)) # should automate this = 2 * 2000 (num_samples * num_chains)
-        log_avg_array[i] = np.median(data.posterior.log_avg.values.reshape(4000))
-        log_scale_array[i] = np.median(data.posterior.log_scale.values.reshape(4000))
-
-    q = np.percentile(q_array, [15.9, 50, 84.1], axis=0)
-
-else:
 
 
-    ## set up NUTS ################################################
-    nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
-    mcmc = MCMC(
+## set up NUTS ################################################
+nuts_kernel = NUTS(numpyro_model, dense_mass=True, target_accept_prob=0.9)
+mcmc = MCMC(
         nuts_kernel,
-        num_warmup=1000,
-        num_samples=2000,
-        num_chains=2,
+        num_warmup=500,
+        num_samples=1000,
+        num_chains=1,
         progress_bar=True,
         )
-    rng_key = jax.random.PRNGKey(34913)
-    ################################################################
+rng_key = jax.random.PRNGKey(34913)
+################################################################
 
-    ## Run the MCMC ################################################
-    mcmc.run(rng_key, X_obs, yerr, y=y_obs)
-    ###############################################################
+## Run the MCMC ################################################
+mcmc.run(rng_key, X_obs_cartesian, yerr, y=y_obs)
+###############################################################
 
-    ## Get fit results ###########################################
-    samples = mcmc.get_samples()
-    pred = samples["pred"].block_until_ready()  # Blocking to get timing right
-    data = az.from_numpyro(mcmc)
-    print(az.summary(
-        data, var_names=[v for v in data.posterior.data_vars if v != "pred"]
+## Get fit results ###########################################
+samples = mcmc.get_samples()
+pred = samples["pred"].block_until_ready()  # Blocking to get timing right
+data = az.from_numpyro(mcmc)
+print(az.summary(
+data, var_names=[v for v in data.posterior.data_vars if v != "pred"]
          ))
 
-    q = np.percentile(pred, [15.9, 50, 84.1], axis=0)
-    
 
-unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
-#######################################################
-
-## Plot fit results ###################################
-fig=plt.figure(figsize=(24,6))
-ax1=fig.add_subplot(131,projection='mollweide')
-ax2=fig.add_subplot(132,projection='mollweide')
-ax3=fig.add_subplot(133,projection='mollweide')
-
-cbar_h=0.075
-cbar_w=0.2
-cbar_bottom=0.1
-
-#ax.imshow(q[1].reshape(len(phi),len(theta)),extent=[0,360,-90,90],origin='lower',vmin=q[1].min(),vmax=q[1].max())
-im=ax1.pcolor(
-        phi-np.pi,
-        theta,
-        q[1].reshape((len(phi), len(theta))).T,
-        vmin=17,vmax=19)
-
-
-ax1.scatter(
-        phi_obs-np.pi,
-        theta_obs,
-        c=y_obs,
-        edgecolor="k",vmin=17,vmax=19)
-
-cax=fig.add_axes([0.135, cbar_bottom, cbar_w, cbar_h])
-
-fig.colorbar(im, orientation="horizontal",cax=cax,label='n(HI) (cm-3)')
-
-
-pred_unc = np.mean([(q[2]-q[1]).reshape((len(phi), len(theta))).T, (q[1]-q[0]).reshape((len(phi), len(theta))).T],axis=0)
-im=ax2.pcolor(
-        phi-np.pi,
-        theta,
-        (unc/q[1]).reshape((len(phi), len(theta))).T / np.log(10) ,#pred_unc,
-        cmap='gray')
-
-
-ax2.plot(
-        phi_obs-np.pi,
-        theta_obs,
-        'o',ms=7,mfc='none',mec='m')
-
-cax2=fig.add_axes([0.41, cbar_bottom, cbar_w, cbar_h])
-fig.colorbar(im, orientation="horizontal",cax=cax2,label='log N(HI) uncertainty (dex)')#label='n(HI) uncertainty (cm-3)')#
-
-
-## I want this one to plot the fractional uncertainty!
-phi_grid, theta_grid=np.meshgrid(phi,theta)
-y_pred = griddata((phi_grid.flatten(),theta_grid.flatten()),q[1],(phi_obs,theta_obs))
-residuals = (y_obs - y_pred)#/y_obs
-
-
-eee=ax3.scatter(
-        phi_obs-np.pi,
-        theta_obs,
-        c=residuals,
-        edgecolor="k",cmap='PiYG',vmin=-0.3,vmax=0.3)
-
-cax3=fig.add_axes([0.685, cbar_bottom, cbar_w, cbar_h])
-fig.colorbar(eee, orientation="horizontal",cax=cax3,label='Residuals in N(HI) estimate')
-
-#####################################################################
-"""
-ndim=4
-nbins=20
-quantiles=[0.16,0.5,0.84]
-truths=None
-show_titles=False
-
-fig, axes = plt.subplots(ndim, ndim, figsize=(12.5,9))
-triangle.corner(data, bins=nbins, #labels=variable_names,
-                      max_n_ticks=3,plot_contours=True,quantiles=quantiles,fig=fig,
-                      show_titles=True,verbose=True,truths=truths,range=None)
-"""
-## Plot histogram of results #########################################
-bins=50
-alpha=0.3
-c0='C0'
-c1='C1'
-
-colors=['C0','C1','C2','C3']
-
-fig=plt.figure(figsize=(8,5))
-ax1 = fig.add_subplot(131)
-ax2 = fig.add_subplot(132)
-#ax3 = fig.add_subplot(233)
-ax4 = fig.add_subplot(133)
-#ax5 = fig.add_subplot(235)
-
-
-if run_loop:
-    ax1.hist(log_amp_array,bins=bins,alpha=alpha)
-    ax2.hist(log_avg_array,bins=bins,alpha=alpha)
-    ax4.hist(log_scale_array,bins=bins,alpha=alpha)
-
-
-else:
-
-    for i in range(len(data.posterior.log_amp.values)):
-        ax1.hist(data.posterior.log_amp.values[i],bins=bins,alpha=alpha,color=colors[i])
-
-        ax2.hist(data.posterior.log_scale.values[i],bins=bins,alpha=alpha,color=colors[i])
-
-
-        ax4.hist(data.posterior.log_avg.values[i],bins=bins,alpha=alpha,color=colors[i])
-        alpha += 0.1
-
-#ax5.hist(data.posterior.log_c.values[0],bins=bins,alpha=alpha,color=c0)
-#ax5.hist(data.posterior.log_c.values[1],bins=bins,alpha=alpha,color=c1)
-#ax5.set_xlabel('log constant')
-
-ax1.set_xlabel('log amp')
-ax4.set_xlabel('log avg')
-ax2.set_xlabel('log scale')
-    #######################################################################
-
-
-## Save fit results to file ############################################
-if True:
-    func_dict = {
-    "15.9%": lambda x: np.percentile(x, 15.9),
-    "median": lambda x: np.percentile(x, 50),
-    "84.1%": lambda x: np.percentile(x, 84.1),
-    }
-    table = az.summary(
-        data, var_names=[v for v in data.posterior.data_vars if v != "pred"], stat_funcs=func_dict
-         )
-    np.savetxt('NHI_column_map_'+filename_precursor +'.txt',np.transpose(q))
-    np.savetxt('NHI_column_fitted_stars_' + filename_precursor + '.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
-    table.to_csv('Bestfit_hyperparameters_' + filename_precursor + '.csv')
-#######################################################################
