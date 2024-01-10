@@ -229,7 +229,7 @@ ax.set_title("log10 N(HI) data")
 plt.colorbar(c)
 
 plt.figure()
-plt.errorbar(d,y_obs,yerr=yerr,fmt='ko')
+plt.errorbar(ds,y_obs,yerr=yerr,fmt='ko')
 plt.xlabel('Distance (pc)',fontsize=18)
 plt.ylabel('N(HI)',fontsize=18)
 #######################################################
