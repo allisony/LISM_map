@@ -3,9 +3,11 @@ from matplotlib import rc, rcParams
 import pandas as pd
 import numpy as np
 from lmfit import Model
-from mathsUtil import *
+#from mathsUtil import *
 from scipy.stats import skewnorm
-
+from scipy.stats.mstats import mquantiles
+from scipy.optimize import fsolve
+import scipy.stats as STS
 ## Pretty plot setup ###################################
 plt.ion()
 
@@ -22,11 +24,120 @@ rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
 
 fs=18
 average_color = 'r'
+
+
+def estSkewNorm(xin,conf=(0.16,0.5,0.84),Guess=None,Mode='Med',Check=True):
+    """
+    Used for estimating the parameters of a Skew Normal distribution that matches input mode/median and given confidence interval.
+    
+    Numerically solves system of equations to give the 3 output parameters of corresponding skew normal. May require multiple guess to result in right solution. Output should give practically exact values, see `Check'.
+    
+    Returns the skew normal parameters (mu, sigma, alpha) --- see wikipedia on skew normal
+    
+    WARNING: Code is provided with minimal explanation, and verfication --- use with that in mind.
+    
+    >---
+    
+    Parameters
+    ----------
+    xin : array_like, tuple, or list, with 3 entries
+        entries correspond to the data value matching the corresponding index in the `conf' key word. By default first entry indicates the lower bound for the central 68% confidence interval, second entry corresponds to median/mode value depending on keyword `Mode', and the third entry is the upper bound for the central 68% confidence interval.
+        
+    conf : array_like, tuple, or list, with 3 entries
+        indicates the values that the skew normal cumulative probability distribution should give with input `xin'. By default, set to median and central 68% confidence interval. If Mode is `Peak' the median equation is replaced by one corresponding to peak of distribution.
+    
+    Guess : array_like, tuple or list, with 3 entries
+        allows for user to input starting point for numerical equation solve. Default values are a general guess. If output does not converge, use Guess to change starting point for computation. May require iteration for adequete solution. Use `Check' to verify. If there is difficult, input parameters may not be well suited for approximation with skew normal.
+    
+    Mode : str one of ['Peak','Med2','Med','SF']
+        Defines to set of equations used in defining the skew normal distribution. If 'Peak' system sets second entry to be the mode of skew normal instead of median. All others are for setting the median, but with slightly different numerical implementations. 'Peak' and 'Med' are the recommended modes.
+        
+    Check : boolean
+        By default it is True. Used as verification on output solution, gives printed diagnostics as check. Outputs for converged solutions should be exact if fully successful.
+    
+    
+    Returns
+    -------
+    
+    out : array_like with 3 entries
+        gives the (mu, sigma, alpha) parameters that define the skew normal distribution matching inputs
+    
+    Notes
+    -----
+    Printed warnings also given from scipy from fsolve to diagnose progress of numerical solution to system of equations
+    
+    Examples
+    --------
+    
+    ## Note that here we use data from https://github.com/jspineda/stellarprop for illustration ; see also Pineda et al. 2021b
+    
+    >> trace = np.genfromtxt('../resources/massradius/fractional_01/chains.csv',delimiter=',',names=True)
+    >> scatlb, scatmid, scatub = confidenceInterval(trace['scatter'])  # the scatter psoterior distribution is asymetric, these are typically the reported values in literature
+    >> print([scatlb,scatmid,scatub])
+    [0.02787424918238516, 0.0320051813038165, 0.03692976181631807]
+    >> params = estSkewNorm( [scatlb, scatmid, scatub])
+    Mode at [0.03121118]
+    Median at 0.032005181304171265
+    Result gives centeral 68.0% confidence interval: (0.027874249182851436, 0.03692976181636316)
+    Peak at [0.03121118] - [0.00333693]  +  [0.00571858]
+    >> print(params)
+    [0.02771848 0.0065575  1.95731243]
+    
+    ## Note that Check outputs reported numerically match nearly exactly to inputs, these would be kinda off if iteration needed
+    ## In this example alpha ~2, indicating positive skewness, peak (mode) is at 0.031, a little less than median at 0.032   -- see appendix of Pineda et al. 2021b
+    
+    
+    """
+    
+    xl, x0, xu = xin
+    cl,c0,cu = conf
+    if Guess is not None:
+        p0 = Guess
+    else:
+        p0 = (x0, (xu-xl)/2., ((xu-x0) - (x0-xl))/ ((xu-xl)/2.)  )
+    
+    ## if block used to toggle set of equations to solve using scipy fsolve
+    if Mode=='Peak':
+        print("Setting Peak of Distribution")
+        def eq_sys(p):
+            mu,sigma,alpha = p
+            t = (x0 - mu)/sigma
+            return STS.skewnorm.cdf(xl,alpha,mu,sigma) - conf[0],STS.skewnorm.cdf(xu,alpha,mu,sigma) - conf[2],alpha*STS.norm.pdf(alpha*t) - STS.norm.cdf(alpha*t)*t
+    elif Mode=='Med2':
+        print("Setting Median of Distribution")
+        def eq_sys(p):
+            mu,sigma,alpha = p
+            return np.power(STS.skewnorm.cdf(xin,alpha,mu,sigma) - np.array(conf),2)
+    elif Mode == 'SF':
+        print("Setting Median of Distribution")
+        def eq_sys(p):
+            mu,sigma,alpha = p
+            return STS.skewnorm.isf(1-np.array(conf),alpha,mu,sigma) - np.array(xin)
+    elif Mode == 'Med':
+        print("Setting Median of Distribution")
+        def eq_sys(p):
+            mu,sigma,alpha = p
+            return (STS.skewnorm.cdf(xl,alpha,mu,sigma)-cl,STS.skewnorm.cdf(x0,alpha,mu,sigma)-c0,STS.skewnorm.cdf(xu,alpha,mu,sigma)-cu)
+
+    out = fsolve(eq_sys,p0)
+
+    if Check:
+        ff = lambda a: STS.norm.pdf(out[2]*a)*out[2] - a*STS.norm.cdf(a*out[2])
+        tm = fsolve(ff,0.2*out[2])
+        xm = tm*out[1] + out[0]
+        print("Mode at {}".format(xm))
+        print("Median at {}".format(STS.skewnorm.median(out[2],out[0],out[1])))
+        print("Result gives centeral {0}% confidence interval:".format((conf[2]-conf[0])*100),STS.skewnorm.interval(conf[2]-conf[0],out[2],out[0],out[1]))
+        print("Peak at {0} - {1}  +  {2} ".format(xm, xm - xl, xu  - xm))
+
+    return out  # out is mu, sigma, alpha
+
+
 ####################################################
 
 
 ## Read in the data -- see format_spreadsheet.py ###
-df = pd.read_csv('NHI_data.csv')
+df = pd.read_csv('targets/NHI_data_July2024.csv')
 ####################################################
 
 
@@ -34,15 +145,58 @@ fig = plt.figure(figsize=(12,5))
 ax = fig.add_subplot(121)
 ax2 = fig.add_subplot(122)
 
-mask1 = df['RA'] >0 #(df['RA'] < 180.) & (df['DEC'] > 0)
+#mask1 = df['RA'] >0 #(df['RA'] < 180.) & (df['DEC'] > 0)
+quadrant1 = (df['RA'] > 180.) & (df['DEC'] > 0)
+quadrant2 = (df['RA'] > 180.) & (df['DEC'] <= 0)
+quadrant3 = (df['RA'] <= 180.) & (df['DEC'] > 0)
+quadrant4 = (df['RA'] <= 180.) & (df['DEC'] <= 0)
 
-ax.errorbar(df['distance (pc)'][mask1], df['N(HI)'][mask1], xerr=df['distance error'][mask1], yerr=df['N(HI) uncertainty'][mask1], fmt='o', color='dodgerblue', ecolor='k', mec='k')
+#ax.errorbar(df['distance (pc)'][mask1], df['N(HI)'][mask1], xerr=df['distance error'][mask1], yerr=df['N(HI) uncertainty'][mask1], fmt='o', color='dodgerblue', ecolor='k', mec='k')
+ax.errorbar(df['distance (pc)'][quadrant1], df['N(HI)'][quadrant1], xerr=df['distance error'][quadrant1], yerr=df['N(HI) uncertainty'][quadrant1], fmt='o', color='C0', ecolor='k', mec='k',label='NE')
+ax.errorbar(df['distance (pc)'][quadrant2], df['N(HI)'][quadrant2], xerr=df['distance error'][quadrant2], yerr=df['N(HI) uncertainty'][quadrant2], fmt='o', color='C1', ecolor='k', mec='k',label='SE')
+ax.errorbar(df['distance (pc)'][quadrant3], df['N(HI)'][quadrant3], xerr=df['distance error'][quadrant3], yerr=df['N(HI) uncertainty'][quadrant3], fmt='o', color='C2', ecolor='k', mec='k',label='NW')
+ax.errorbar(df['distance (pc)'][quadrant4], df['N(HI)'][quadrant4], xerr=df['distance error'][quadrant4], yerr=df['N(HI) uncertainty'][quadrant4], fmt='o', color='C3', ecolor='k', mec='k',label='SW')
 
-print(np.mean(df['N(HI)'][mask1]), np.std(df['N(HI)'][mask1]))
+
+d1 = df['distance (pc)'] <= 5.
+d2 = (df['distance (pc)'] > 5.) & (df['distance (pc)'] <= 10.)
+d3 = (df['distance (pc)'] > 10.) & (df['distance (pc)'] <= 50.)
+d4 = (df['distance (pc)'] > 50.) & (df['distance (pc)'] <= 100.)
+
+lw=5
+a=0.5
+
+ax.hlines(np.mean(df['N(HI)'][quadrant1 & d1]),0,5, color='C0',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant1 & d2]),5,10, color='C0',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant1 & d3]),10,50, color='C0',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant1 & d4]),50,100, color='C0',alpha=a,linewidth=lw)
+
+ax.hlines(np.mean(df['N(HI)'][quadrant2 & d1]),0,5, color='C1',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant2 & d2]),5,10, color='C1',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant2 & d3]),10,50, color='C1',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant2 & d4]),50,100, color='C1',alpha=a,linewidth=lw)
+
+ax.hlines(np.mean(df['N(HI)'][quadrant3 & d1]),0,5, color='C2',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant3 & d2]),5,10, color='C2',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant3 & d3]),10,50, color='C2',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant3 & d4]),50,100, color='C2',alpha=a,linewidth=lw)
+
+ax.hlines(np.mean(df['N(HI)'][quadrant4 & d1]),0,5, color='C3',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant4 & d2]),5,10, color='C3',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant4 & d3]),10,50, color='C3',alpha=a,linewidth=lw)
+ax.hlines(np.mean(df['N(HI)'][quadrant4 & d4]),50,100, color='C3',alpha=a,linewidth=lw)
+
+print(np.mean(df['N(HI)']), np.std(df['N(HI)']))
+
+print(np.mean(df['N(HI)'][quadrant1]), np.std(df['N(HI)'][quadrant1]))
+print(np.mean(df['N(HI)'][quadrant2]), np.std(df['N(HI)'][quadrant2]))
+print(np.mean(df['N(HI)'][quadrant3]), np.std(df['N(HI)'][quadrant3]))
+print(np.mean(df['N(HI)'][quadrant4]), np.std(df['N(HI)'][quadrant4]))
 
 ax.set_xlabel('Distance (pc)', fontsize=fs)
 ax.set_ylabel('log$_{10}$[N(HI)/cm$^{-2}$]', fontsize=fs)
 ax.set_xscale('log')
+
 
 ax.minorticks_on()
 
@@ -54,12 +208,12 @@ ax.plot(d, np.log10(0.01 * d * 3.09e18), linestyle='--', color='gray')
 ax.plot(d, np.log10(0.001 * d * 3.09e18), linestyle='--', color='gray')
 
 ax.set_xlim([1,100])
-ax.set_ylim([17,19.5])
+ax.set_ylim([17,19.7])
 
 
 
 
-## distance shell averages? (add in area-weighting later! or not)
+## distance shell averages? (add in area-weighting later! or not) # 3/10/24 - add in quadrants??
 nHI = 10**(df['N(HI)']) / (df['distance (pc)'] * 3.09e18)
 
 d_avgs = np.logspace(0,2,15)
@@ -94,6 +248,97 @@ np.savetxt('nHI_averages_with_distance.txt',np.transpose(np.array([d_bins, nHI_a
 ###############
 
 fig.subplots_adjust(left=0.08, right=0.97, top=0.97, bottom=0.13, wspace=0.25)
+
+### QUADRANT 1-4
+
+nHI_avgs_1 = np.zeros(len(d_bins))
+nHI_68p_low_1 = np.copy(d_bins)
+nHI_68p_high_1 = np.copy(d_bins)
+for i in range(len(d_bins)):
+
+    if i == 0:
+        mask = df['distance (pc)'][quadrant1] <= d_avgs[i+1]
+    else:
+        mask = (df['distance (pc)'][quadrant1] > d_avgs[i] ) & (df['distance (pc)'][quadrant1] <= d_avgs[i+1])
+        
+    if len(nHI[quadrant1][mask]) > 0:
+        nHI_avgs_1[i] = np.median(nHI[quadrant1][mask])
+        nHI_68p_low_1[i], nHI_68p_high_1[i] = np.percentile(nHI[quadrant1][mask],[15.9, 84.1])
+    else:
+        nHI_avgs_1[i] = np.nan
+        nHI_68p_low_1[i], nHI_68p_high_1[i] = [np.nan, np.nan]
+
+
+
+nHI_avgs_2 = np.zeros(len(d_bins))
+nHI_68p_low_2 = np.copy(d_bins)
+nHI_68p_high_2 = np.copy(d_bins)
+for i in range(len(d_bins)):
+
+    if i == 0:
+        mask = df['distance (pc)'][quadrant2] <= d_avgs[i+1]
+    else:
+        mask = (df['distance (pc)'][quadrant2] > d_avgs[i] ) & (df['distance (pc)'][quadrant2] <= d_avgs[i+1])
+        
+    if len(nHI[quadrant2][mask]) > 0:
+        nHI_avgs_2[i] = np.median(nHI[quadrant2][mask])
+        nHI_68p_low_2[i], nHI_68p_high_2[i] = np.percentile(nHI[quadrant2][mask],[15.9, 84.1])
+    else:
+        nHI_avgs_2[i] = np.nan
+        nHI_68p_low_2[i], nHI_68p_high_2[i] = [np.nan, np.nan]
+
+
+
+nHI_avgs_3 = np.zeros(len(d_bins))
+nHI_68p_low_3 = np.copy(d_bins)
+nHI_68p_high_3 = np.copy(d_bins)
+for i in range(len(d_bins)):
+
+    if i == 0:
+        mask = df['distance (pc)'][quadrant3] <= d_avgs[i+1]
+    else:
+        mask = (df['distance (pc)'][quadrant3] > d_avgs[i] ) & (df['distance (pc)'][quadrant3] <= d_avgs[i+1])
+
+    if len(nHI[quadrant3][mask]) > 0:
+        nHI_avgs_3[i] = np.median(nHI[quadrant3][mask])
+        nHI_68p_low_3[i], nHI_68p_high_3[i] = np.percentile(nHI[quadrant3][mask],[15.9, 84.1])
+    else:
+        nHI_avgs_3[i] = np.nan
+        nHI_68p_low_3[i], nHI_68p_high_3[i] = [np.nan, np.nan]
+
+
+
+nHI_avgs_4 = np.zeros(len(d_bins))
+nHI_68p_low_4 = np.copy(d_bins)
+nHI_68p_high_4 = np.copy(d_bins)
+for i in range(len(d_bins)):
+
+    if i == 0:
+        mask = df['distance (pc)'][quadrant4] <= d_avgs[i+1]
+    else:
+        mask = (df['distance (pc)'][quadrant4] > d_avgs[i] ) & (df['distance (pc)'][quadrant4] <= d_avgs[i+1])
+
+    if len(nHI[quadrant4][mask]) > 0:
+        nHI_avgs_4[i] = np.median(nHI[quadrant4][mask])
+        nHI_68p_low_4[i], nHI_68p_high_4[i] = np.percentile(nHI[quadrant4][mask],[15.9, 84.1])
+    else:
+        nHI_avgs_4[i] = np.nan
+        nHI_68p_low_4[i], nHI_68p_high_4[i] = [np.nan, np.nan]
+
+
+
+
+#####
+ax2.plot(d_bins,nHI_avgs_1,'o', color='C0',mec='k',label='NE')
+ax2.plot(d_bins,nHI_avgs_2,'o', color='C1',mec='k',label='SE')
+ax2.plot(d_bins,nHI_avgs_3,'o', color='C2',mec='k',label='NW')
+ax2.plot(d_bins,nHI_avgs_4,'o', color='C3',mec='k',label='SW')
+
+ax2.legend(title="Sky quadrants")
+
+#ax2.errorbar(d_bins, nHI_avgs, yerr=[nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs], fmt='none', ecolor='k')
+
+
 
 def radial_model(d_array,max_value, max_distance):
 
@@ -184,6 +429,8 @@ initial_model_profile_2_components = model_2_components.eval(params, d_array=d_b
 
 result_2_components = model_2_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
 print(result_2_components.fit_report())
+fit_2_components = fit_model_2_components(d_bins[2:], result_2_components.best_values['mv1'], result_2_components.best_values['md1'], result_2_components.best_values['mv2'],  result_2_components.best_values['md2'])
+#ax2.plot(d_bins[2:],fit_2_components,color='b')
 
 
 
@@ -225,6 +472,9 @@ initial_model_profile_3_components = model_3_components.eval(params, d_array=d_b
 
 result_3_components = model_3_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
 print(result_3_components.fit_report())
+
+fit_3_components = fit_model_3_components(d_bins[2:], result_2_components.best_values['mv1'], result_2_components.best_values['md1'], result_2_components.best_values['mv2'],  result_2_components.best_values['md2'],result_3_components.best_values['mv3'], result_3_components.best_values['md3'])
+#ax2.plot(d_bins[2:],fit_3_components,color='g')
 
 
 
@@ -271,10 +521,11 @@ initial_model_profile_4_components = model_4_components.eval(params, d_array=d_b
 unc = np.mean([nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs],axis=0)
 unc[1] = unc[0]
 
-result_4_components = model_4_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
+result_4_components = model_4_components.fit(nHI_avgs[1:], d_array=d_bins[1:])#, weights=1./unc) # weights need fixing!
 print(result_4_components.fit_report())
 
-
+fit_4_components = fit_model_4_components(d_bins[1:], result_4_components.best_values['mv1'], result_4_components.best_values['md1'], result_4_components.best_values['mv2'],  result_4_components.best_values['md2'], result_4_components.best_values['mv3'], result_4_components.best_values['md3'], result_4_components.best_values['mv4'], result_4_components.best_values['md4'])
+ax2.plot(d_bins[1:],fit_4_components,color='r',linewidth=3)
 
 def fit_model_5_components(d_array, mv1, md1, mv2, md2, mv3, md3, mv4, md4, mv5, md5):
 
@@ -323,10 +574,13 @@ model_5_components.print_param_hints()
 
 initial_model_profile_5_components = model_5_components.eval(params, d_array=d_bins)
 
-result_5_components = model_5_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
+result_5_components = model_5_components.fit(nHI_avgs[1:], d_array=d_bins[1:])#, weights=1./unc) # weights need fixing!
 print(result_5_components.fit_report())
 
+fit_5_components = fit_model_5_components(d_bins[1:], result_5_components.best_values['mv1'], result_5_components.best_values['md1'], result_5_components.best_values['mv2'],  result_5_components.best_values['md2'], result_5_components.best_values['mv3'], result_5_components.best_values['md3'], result_5_components.best_values['mv4'], result_5_components.best_values['md4'], result_5_components.best_values['mv5'], result_5_components.best_values['md5'])
+#ax2.plot(d_bins[1:],fit_5_components,color='g',linewidth=3)
 
+import pdb; pdb.set_trace()
 
 
 d_array = np.logspace(0,2,100)
@@ -371,7 +625,7 @@ for i in range(len(nHI_avgs[2:])):
 
 #sk=skewnorm.pdf(np.arange(0,10,0.01), out[2], loc=out[0], scale=out[1])
 
-nruns=10000
+nruns=100
 
 mv1_1components = np.zeros(nruns)
 md1_1components = np.zeros(nruns)

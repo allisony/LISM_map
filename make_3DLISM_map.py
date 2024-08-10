@@ -241,12 +241,12 @@ def numpyro_model(X_obs, yerr, y=None):
     avg = numpyro.sample("log10_avg", dist.Cauchy(-1,0.5)) # log10 of the average number density (cm^{-3})
     amp = numpyro.sample("log_amp", dist.Cauchy(0,10)) # ln(amplitude) 
     length_scale1 = numpyro.sample("log_lengthscale1", dist.Normal(-1,0.5))
-    length_scale2 = numpyro.sample("log_lengthscale2", dist.Normal(-1,0.5))
-    length_scale3 = numpyro.sample("log_lengthscale3", dist.Normal(-1,0.5))
+    #length_scale2 = numpyro.sample("log_lengthscale2", dist.Normal(-1,0.5))
+    #length_scale3 = numpyro.sample("log_lengthscale3", dist.Normal(-1,0.5))
 
-    log10_density = jnp.exp(amp) * kernels.ExpSquared(
-                        jnp.array([jnp.power(10,length_scale1),jnp.power(10,length_scale2),
-                        jnp.power(10,length_scale3)])  ) # model of the number density (cm^{-3})
+    log10_density = jnp.exp(amp) * kernels.ExpSquared(jnp.power(10,length_scale1))
+                        #jnp.array([jnp.power(10,length_scale1),jnp.power(10,length_scale2),
+                        #jnp.power(10,length_scale3)])  ) # model of the number density (cm^{-3})
 
 
     density = jnp.power(10,log10_density)

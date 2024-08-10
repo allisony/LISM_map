@@ -20,6 +20,7 @@ import astropy.units as u
 import numpyro
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
+from numpyro.contrib.control_flow import scan
 import arviz as az
 import corner as triangle
 from scipy.interpolate import griddata
@@ -56,7 +57,7 @@ class GreatCircleDistance(kernels.stationary.Distance):
 
 
 ## Read in the data -- see format_spreadsheet.py ###
-df = pd.read_csv('NHI_data.csv')
+df = pd.read_csv('targets/NHI_data_July2024.csv')
 ####################################################
 
 ## Make a spherical grid#############################
@@ -78,32 +79,42 @@ X_grid_RADec = np.vstack((phi_grid,theta_grid))
 
 ## Put star coordinates on that grid ###############
 skycoords = SkyCoord(ra= df['RA'] * u.degree, dec = df['DEC'] * u.degree)
-X_obs = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
-theta_obs = df['DEC'].values * np.pi/180. 
-phi_obs  = df['RA'].values * np.pi/180.
+X_obs_all = np.array(skycoords.cartesian.xyz.T) # shape (100,3) -- for unit vectors
+theta_obs_all = df['DEC'].values * np.pi/180. 
+phi_obs_all  = df['RA'].values * np.pi/180.
 ####################################################
 
 
 ## Set up data to fit ##############################
-y_obs = df['N(HI)'].values
-yerr= df['N(HI) uncertainty'].values
+y_obs_all = df['N(HI)'].values
+yerr_all= df['N(HI) uncertainty'].values
 
-d = df['distance (pc)']
+d_all = df['distance (pc)']
 
 run_loop = False
 n_runs = 100
 
 if True:
 
-    mask = d>10#(d>30) & (d <= 50)
-    filename_precursor = 'all_outside_10pc'
+    mask =  (d_all>10) & (d_all <= 100) # # d_all<=10 #
+    filename_precursor = '10_100pc'
 
-    y_obs = y_obs[mask]
-    yerr = yerr[mask]
-    theta_obs = theta_obs[mask]
-    phi_obs = phi_obs[mask]
-    X_obs = X_obs[mask]
-    d = d[mask]
+    y_obs = y_obs_all[mask]
+    yerr = yerr_all[mask]
+    theta_obs = theta_obs_all[mask]
+    phi_obs = phi_obs_all[mask]
+    X_obs = X_obs_all[mask]
+    d = d_all[mask]
+
+    lower_mask = d_all<=10 #10  ## EDIT
+    X_obs_lower = X_obs_all[lower_mask]
+    y_lower = y_obs_all[lower_mask]
+    yerr_lower = yerr_all[lower_mask]
+    
+    upper_mask = d_all > 100 ### EDIT
+    X_obs_upper = X_obs_all[upper_mask]
+    y_upper = y_obs_all[upper_mask]
+    yerr_upper = yerr_all[upper_mask]
 
 
 ####################################################
@@ -130,12 +141,10 @@ plt.ylabel('N(HI)',fontsize=18)
 
 
 ## Define model to fit ################################
-def numpyro_model(X_obs, yerr, y=None): 
+def numpyro_model(X_obs, yerr, y=None, X_obs_upper=None, y_upper=None, yerr_upper = None, X_obs_lower=None, y_lower=None, yerr_lower=None): 
     avg1 = numpyro.sample("log_avg", dist.Cauchy(18,2)) # do I need to change this?? it should be log?
     amp1 = numpyro.sample("log_amp", dist.Cauchy(0,10))
     scale1 = numpyro.sample("log_scale", dist.Normal(-1,0.5))
-    #sigma1 = numpyro.sample("sigma", dist.HalfNormal(0.2))
-    #c1 = numpyro.sample("log_c",dist.Normal(0,10))
 
     kernel = jnp.exp(amp1) * kernels.Exp(jnp.exp(scale1), distance=GreatCircleDistance()) #+ kernels.Constant(jnp.exp(c1))
 
@@ -146,8 +155,44 @@ def numpyro_model(X_obs, yerr, y=None):
         mean=jnp.exp(avg1))
 
 
-    numpyro.sample("gp", gp.numpyro_dist(), obs=y)
+    # For uncensored data
+    if y is not None:
+        numpyro.sample("gp", gp.numpyro_dist(), obs=y)
 
+    # For upper limits, incorporating uncertainties
+    if X_obs_upper is not None and y_upper is not None and yerr_upper is not None:
+        # Predict at X_obs_upper locations
+        mu_upper, var_upper = gp.predict(y, X_obs_upper, return_var=True)
+        # Adjust the variance to include the uncertainty in the upper limit
+        #adjusted_var_upper = var_upper + yerr_upper**2
+
+        #upper_limit_likelihood = 1 - dist.Normal(mu_upper, jnp.sqrt(adjusted_var_upper)).cdf(y_upper)
+        #numpyro.factor("upper_limit", jnp.log(upper_limit_likelihood))
+        #upper_distance = (mu_upper - jnp.sqrt(var_upper)) < (y_upper + yerr_upper)
+        upper_distance = (y_upper + yerr_upper) - (mu_upper - jnp.sqrt(var_upper))
+        upper_limit_likelihood = jax.nn.sigmoid(1e3*upper_distance)
+        #print("upper")
+        #print(upper_distance, upper_limit_likelihood, jnp.log(upper_limit_likelihood))
+        numpyro.factor("upper_limit", jnp.log(upper_limit_likelihood))
+        
+
+    # For lower limits, incorporating uncertainties
+    if X_obs_lower is not None and y_lower is not None and yerr_lower is not None:
+        # Predict at X_obs_lower locations
+        mu_lower, var_lower = gp.predict(y, X_obs_lower, return_var=True)
+        # Adjust the variance to include the uncertainty in the lower limit
+        #adjusted_var_lower = var_lower + yerr_lower**2
+        #lower_limit_likelihood = dist.Normal(mu_lower, jnp.sqrt(adjusted_var_lower)).cdf(y_lower)
+        #numpyro.factor("lower_limit", jnp.log(lower_limit_likelihood))
+        #lower_distance = (mu_lower + jnp.sqrt(var_lower)) > (y_lower - yerr_lower)
+        lower_distance = (mu_lower + jnp.sqrt(var_lower)) - (y_lower - yerr_lower)
+        lower_limit_likelihood = jax.nn.sigmoid(1e3*lower_distance)
+        #print("lower")
+        #print(lower_distance, lower_limit_likelihood, jnp.log(lower_limit_likelihood))
+
+        numpyro.factor("lower_limit", jnp.log(lower_limit_likelihood))
+
+        
     if y is not None:
         numpyro.deterministic("pred", gp.predict(y, X_grid))
 #######################################################
@@ -207,7 +252,7 @@ else:
     ################################################################
 
     ## Run the MCMC ################################################
-    mcmc.run(rng_key, X_obs, yerr, y=y_obs)
+    mcmc.run(rng_key, X_obs, yerr, y=y_obs, X_obs_upper=X_obs_upper, y_upper=y_upper, yerr_upper = yerr_upper, X_obs_lower=X_obs_lower, y_lower=y_lower, yerr_lower=yerr_lower)
     ###############################################################
 
     ## Get fit results ###########################################
@@ -342,7 +387,7 @@ ax2.set_xlabel('log scale')
 
 
 ## Save fit results to file ############################################
-if False:
+if True:
     func_dict = {
     "15.9%": lambda x: np.percentile(x, 15.9),
     "median": lambda x: np.percentile(x, 50),
@@ -351,7 +396,7 @@ if False:
     table = az.summary(
         data, var_names=[v for v in data.posterior.data_vars if v != "pred"], stat_funcs=func_dict
          )
-    np.savetxt('NHI_column_map_'+filename_precursor +'.txt',np.transpose(q))
-    np.savetxt('NHI_column_fitted_stars_' + filename_precursor + '.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
-    table.to_csv('Bestfit_hyperparameters_' + filename_precursor + '.csv')
+    np.savetxt('July2024/NHI_column_map_'+filename_precursor +'_upperlowerlimits.txt',np.transpose(q))
+    np.savetxt('July2024/NHI_column_fitted_stars_' + filename_precursor + '_upperlowerlimits.txt',np.transpose(np.array([phi_obs,theta_obs,y_obs])))
+    table.to_csv('July2024/Bestfit_hyperparameters_' + filename_precursor + '_upperlowerlimits.csv')
 #######################################################################
