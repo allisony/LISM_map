@@ -23,8 +23,8 @@ cbar_bottom=0.1
 file_prefixes = ['10pc','10_20pc','20_30pc','30_50pc','50_100pc','all_outside_10pc','all']
 params = ['amp', 'avg', 'scale']
 
-phi = np.linspace(0, 2.*np.pi, 200)
-theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
+phi = np.linspace(0, 2.*np.pi, 600)
+theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 600)
 phi_grid, theta_grid=np.meshgrid(phi,theta)
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -55,7 +55,7 @@ for i in range(len(theta)):
             #print(i,j)
 
 
-            ## draw a 1x1 deg square around this cell, and calculate # stars from latlon in that square
+            ## draw a 1x1 deg square around this c`ell, and calculate # stars from latlon in that square
             ## or calculate the haversine distance to all latlon stars, and find how many are within X deg radius
             ## divide that number by pi * X**2 sq deg to get the surface density
 
@@ -169,7 +169,7 @@ if False:
 
 ## figure for paper
 
-make_fig = False
+make_fig = True
 
 if make_fig:
     fig=plt.figure(figsize=(15,12))
@@ -193,22 +193,80 @@ if make_fig:
     axxes_list = [axx1, axx2, axx3, axx4, axx5, axx6]
 
 
-phi = np.linspace(-np.pi, np.pi, 200)
-theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 200)
+
+phi = np.linspace(-np.pi, np.pi, 600)
+theta = np.linspace(-0.5 * np.pi, 0.5 * np.pi, 600)
+
+"""
+phi_grid, theta_grid = np.meshgrid(phi, theta)
+
+l_grid = np.zeros_like(phi_grid)
+b_grid = np.zeros_like(theta_grid)
+
+c = coord.SkyCoord(ra=phi_grid*u.radian,dec=theta_grid*u.radian,frame='icrs')
+
+l_grid = c.galactic.l
+l_grid = l_grid.wrap_at('180d', inplace=False)
+l_grid = l_grid.radian
+b_grid = c.galactic.b.radian
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = np.unravel_index(np.argmin(np.abs(array - value)), array.shape)
+    return array[idx], idx
+
+def find_nearest2(array1, value1, array2, value2):
+    array1 = np.asarray(array1)
+    array2 = np.asarray(array2)
+
+    dist1 = np.abs(array1 - value1)
+    dist2 =np.abs(array2 - value2)
+
+    idx = np.unravel_index(np.argmin(np.sqrt(dist1**2 + dist2**2)), array1.shape)
+    return array1[idx], array2[idx], idx
 
 
+data_new = np.zeros_like(data)
+for ii in range(len(phi)):
+    print(ii)
+    for jj in range(len(theta)):
+        tmp1, tmp2, idx = find_nearest2(l_grid, phi_grid[ii,jj], b_grid, theta_grid[ii,jj])
+        #print(idx, data[ii,jj])
+        data_new[idx] = data[ii,jj]
 
 
+for i in range(len(phi)):
+    phi_i = phi[i]
+    for j in range(len(theta)):
+
+        
+        theta_i = theta[i]
+
+        find_nearest(l_grid)
+
+closest_index = np.unravel_index(np.argmin(np.abs(np.sqrt((l_grid - phi_grid[i, j])**2 + (b_grid - theta_grid[i,j])**2))), l_grid.shape)
+
+        diff = np.sqrt((l_grid - phi_grid[i, j])**2 + (theta_grid - theta_grid[i, j])**2)
+        
+        # Find the index of the minimum difference
+        closest_index = np.unravel_index(np.argmin(diff), diff.shape)
+        
+        # Store the result (coordinates and their closest match)
+        closest_matches.append(((i, j), closest_index, l_grid[closest_index], theta_grid[closest_index]))
+
+"""
 cloud_path = '/Users/aayoungb/Documents/MyPapers/Proposals/Missions/ESCAPE/Redfield_ISM_cloud_boundaries_ra_dec/'
 cloud_name = 'Blue'
 df_cloud = pd.read_csv(cloud_path + cloud_name + '_ra_dec.csv')
 #fig.text(0.5,0.95,cloud_name.replace('_',''),fontsize=22)
 
-file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/July2024/'
+#file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/July2024/'
+file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/Feb2025/'
 file_prefixes = ['all_inside_10pc','10_20pc','20_30pc','30_50pc','50_70pc','70_100pc']
 titles = ['$<$10 pc','10-20 pc','20-30 pc','30-50 pc','50-70 pc','70-100 pc']
 #params = ['amp', 'amp2', 'avg','scale','scale2']
 
+#import pdb; pdb.set_trace()
 for i in range(len(file_prefixes)):
 
     df = pd.read_csv(file_path+'Bestfit_hyperparameters_' + file_prefixes[i] + '_upperlowerlimits.csv')
@@ -219,6 +277,11 @@ for i in range(len(file_prefixes)):
 
     q = NHI.transpose()
     unc = np.mean([q[1]-q[0],q[2]-q[1]],axis=0)
+
+    figs=plt.figure()
+    axs = figs.add_subplot(111)
+    axs.hist(q[1,:]-q[0,:],bins=100)
+    axs.hist(q[2,:]-q[1,:],bins=100,alpha=0.7)
 
     phi_obs = coord.Angle(stars[:,0] * u.rad)
     theta_obs = coord.Angle(stars[:,1] * u.rad)
@@ -259,7 +322,7 @@ for i in range(len(file_prefixes)):
             -phi_obs,
             theta_obs,
             c=y_obs,
-            edgecolor="k",vmin=17.5,vmax=19,marker='*',s=75,edgecolors='w')
+            edgecolor="k",vmin=17.5,vmax=19,marker='*',s=100,edgecolors='w')
 
         CS=axes_list[i].contour(-phi,
             theta,
