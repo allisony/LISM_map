@@ -1,8 +1,10 @@
 from plot_EUV_ISM_attenuation_curve import *
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, BoundaryNorm, ListedColormap
 import joblib
+import matplotlib.ticker
+import matplotlib.cm as cm
 
 plt.ion()
 
@@ -22,7 +24,7 @@ mask = (wave == 100) + (wave == 200) + (wave == 300)
 h1_col_mean_array = np.arange(17.,19.6,0.1)
 h1_col_sig_array = np.array([0.01,0.05,0.1,0.2,0.3,0.4,0.5])
 
-he_uncertainty = False
+he_uncertainty = True
 
 
 run = False
@@ -47,7 +49,7 @@ if run:
 
     fractional_uncertainties_to_store = np.zeros((len(h1_col_mean_array),len(h1_col_sig_array),int(mask.sum())))
 
-    n=5000
+    n=10000
 
 
     for i in range(len(h1_col_mean_array)):
@@ -73,7 +75,8 @@ if run:
 
                 if he_uncertainty:
                     rel_he1 = np.random.normal(loc=rel_he1_val,scale=rel_he1_sig)
-                    frac_he2 = np.random.normal(loc=frac_he2_val,scale=frac_he2_sig)
+                    #frac_he2 = np.random.normal(loc=frac_he2_val,scale=frac_he2_sig)
+                    frac_he2 = np.random.uniform(low=0.0, high=frac_he2_val)
                 else:
                     rel_he1 = rel_he1_val
                     frac_he2 = frac_he2_val
@@ -92,7 +95,12 @@ if run:
 
 else:
     
-    with open("../fractional_uncertainties_100_600_Ang.pkl", "rb") as f:
+    if he_uncertainty:
+        filename='fractional_uncertainties_100_600_Ang_with_helium_var.pkl'
+    else:
+        filename = 'fractional_uncertainties_100_600_Ang.pkl'
+
+    with open("../" + filename, "rb") as f:
 
         h1_col_mean_array,h1_col_sig_array,fractional_uncertainties_to_store = joblib.load(f)
 
@@ -109,39 +117,47 @@ ax8 = fig.add_subplot(338)
 ax9 = fig.add_subplot(339)
 
 
-#c=ax1.imshow(fractional_uncertainties_to_store[:,:,0].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
+#c=ax1.imshow(fractional_uncertainties_to_store[:,:,0].transpose(),norm=LogNorm(vmin=0.001, vmax=vmax),origin='lower',aspect='auto',
 #                              extent=[np.min(h1_col_mean_array),np.max(h1_col_mean_array),np.min(h1_col_sig_array),np.max(h1_col_sig_array)])
-#ax2.imshow(fractional_uncertainties_to_store[:,:,1].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
+#ax2.imshow(fractional_uncertainties_to_store[:,:,1].transpose(),norm=LogNorm(vmin=0.001, vmax=vmax),origin='lower',aspect='auto',
 #                              extent=[np.min(h1_col_mean_array),np.max(h1_col_mean_array),np.min(h1_col_sig_array),np.max(h1_col_sig_array)])
-#ax3.imshow(fractional_uncertainties_to_store[:,:,2].transpose(),norm=LogNorm(vmin=0.001, vmax=1),origin='lower',aspect='auto',
+#ax3.imshow(fractional_uncertainties_to_store[:,:,2].transpose(),norm=LogNorm(vmin=0.001, vmax=vmax),origin='lower',aspect='auto',
 #                              extent=[np.min(h1_col_mean_array),np.max(h1_col_mean_array),np.min(h1_col_sig_array),np.max(h1_col_sig_array)])
 
-levels=[0.0001,0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,10,1e35]
+#levels=[0.0001,0.01,0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,10,1e35]
+levels=[0.0001,0.01,0.05,0.1,0.25,0.5,0.75,1,2,10,100,1e35]#1e35
+viridis = cm.get_cmap('viridis')
+colors = [viridis(i / (len(levels) - 1)) for i in range(len(levels))]
+norm = BoundaryNorm(boundaries=levels + [levels[-1] + 1], ncolors=len(colors))
+cmap = ListedColormap(colors)
 
 nlevels=20
 
+vmin=0.001
+vmax=100.0
+
 xx, yy = np.meshgrid(h1_col_mean_array,h1_col_sig_array)
-ax1.contourf(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax2.contourf(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),vmin=0.01, vmax=1,levels=levels)
-cs=ax3.contourf(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax4.contourf(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax5.contourf(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax6.contourf(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax7.contourf(xx,yy,fractional_uncertainties_to_store[:,:,6].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax8.contourf(xx,yy,fractional_uncertainties_to_store[:,:,7].transpose(),vmin=0.01, vmax=1,levels=levels)
-ax9.contourf(xx,yy,fractional_uncertainties_to_store[:,:,8].transpose(),vmin=0.01, vmax=1,levels=levels)
+ax1.contourf(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax2.contourf(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),levels=levels,norm=norm,cmap=cmap)
+cs=ax3.contourf(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax4.contourf(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax5.contourf(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax6.contourf(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax7.contourf(xx,yy,fractional_uncertainties_to_store[:,:,6].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax8.contourf(xx,yy,fractional_uncertainties_to_store[:,:,7].transpose(),levels=levels,norm=norm,cmap=cmap)
+ax9.contourf(xx,yy,fractional_uncertainties_to_store[:,:,8].transpose(),levels=levels,norm=norm,cmap=cmap)
 
 if True:
     lw=0.5
-    ax1.contour(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax2.contour(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax3.contour(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax4.contour(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax5.contour(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax6.contour(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax7.contour(xx,yy,fractional_uncertainties_to_store[:,:,6].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax8.contour(xx,yy,fractional_uncertainties_to_store[:,:,7].transpose(),levels=levels,colors='k',linewidths=lw)
-    ax9.contour(xx,yy,fractional_uncertainties_to_store[:,:,8].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS1=ax1.contour(xx,yy,fractional_uncertainties_to_store[:,:,0].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS2=ax2.contour(xx,yy,fractional_uncertainties_to_store[:,:,1].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS3=ax3.contour(xx,yy,fractional_uncertainties_to_store[:,:,2].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS4=ax4.contour(xx,yy,fractional_uncertainties_to_store[:,:,3].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS5=ax5.contour(xx,yy,fractional_uncertainties_to_store[:,:,4].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS6=ax6.contour(xx,yy,fractional_uncertainties_to_store[:,:,5].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS7=ax7.contour(xx,yy,fractional_uncertainties_to_store[:,:,6].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS8=ax8.contour(xx,yy,fractional_uncertainties_to_store[:,:,7].transpose(),levels=levels,colors='k',linewidths=lw)
+    CS9=ax9.contour(xx,yy,fractional_uncertainties_to_store[:,:,8].transpose(),levels=levels,colors='k',linewidths=lw)
 
 
 
@@ -184,11 +200,24 @@ ax7.set_xticks([17.5,18.,18.5,19])
 ax8.set_xticks([17.5,18.,18.5,19])
 ax9.set_xticks([17.5,18.,18.5,19])
 
+fmt = matplotlib.ticker.FormatStrFormatter('%.2f')
+ax1.clabel(CS1, CS1.levels, inline=True, fontsize=10,fmt=fmt)
+ax2.clabel(CS2, CS2.levels, inline=True, fontsize=10,fmt=fmt)
+ax3.clabel(CS3, CS3.levels, inline=True, fontsize=10,fmt=fmt)
+ax4.clabel(CS4, CS4.levels, inline=True, fontsize=10,fmt=fmt)
+ax5.clabel(CS5, CS5.levels, inline=True, fontsize=10,fmt=fmt)
+ax6.clabel(CS6, CS6.levels, inline=True, fontsize=10,fmt=fmt)
+ax7.clabel(CS7, CS7.levels, inline=True, fontsize=10,fmt=fmt)
+ax8.clabel(CS8, CS8.levels, inline=True, fontsize=10,fmt=fmt)
+ax9.clabel(CS9, CS9.levels, inline=True, fontsize=10,fmt=fmt)
+
+
 fig.subplots_adjust(left=0.1,right=0.82,bottom=0.11,top=0.9, hspace=0.3)
 
 cax = plt.axes([0.85, 0.11, 0.03, 0.79]) # left, bottom, width, top
 cbar = fig.colorbar(cs, cax=cax, ticks=levels,drawedges=True) #also cs.levels
-cbar.set_ticklabels([' ', '0.01', '0.05','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9','1','10',' '])
+#cbar.set_ticklabels([' ', '0.01', '0.05','0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9','1','10',' '])
+cbar.set_ticklabels([' ','0.01','0.05', '0.1','0.25','0.5','0.75','1','2','10','100','$>$100'])
 cbar.set_label('Fractional uncertainty',fontsize=18)
 
 
@@ -200,7 +229,7 @@ else:
     filename = "../fractional_uncertainties_100_600_Ang.pkl"
 
 
-if not run: 
+if run: 
     with open(filename, "wb") as f:
         joblib.dump([h1_col_mean_array,h1_col_sig_array,fractional_uncertainties_to_store], f)
 

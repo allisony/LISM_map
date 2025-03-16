@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rc, rcParams
 import pandas as pd
 import numpy as np
+from lyapy import voigt
 
 c_km = 2.99792458e5
 
@@ -19,6 +20,16 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 rc('text.latex', preamble=r'\usepackage[helvet]{sfmath}')
 
+pc_in_cm = 3.08567758e18
+au_in_cm = 1.49597871e13
+lya_rest = 1215.67
+c_km = 2.99792458e5
+
+lya_rest = 1215.67
+ccgs = 2.99792458e10
+e=4.8032e-10            # electron charge in esu
+mp=1.6726231e-24        # proton mass in grams
+me=mp/1836.             # electron mass in grams
 
 
 def total_tau_profile_func_euv(wave_to_fit,h1_col,h1_vel,rel_he1=0.08,frac_he2=0.6,which_line='all'):
@@ -123,34 +134,264 @@ def tau_profile_euv(ncols,vshifts,which_line,rel_he1=0.08,frac_he2=0.6):
 
     return wave_all,tau_interp
 
-h1_vel = 0
-wave = np.arange(50,950,1)
+def total_tau_profile_func(wave_to_fit,h1_col,h1_b,h1_vel,d2h=1.5e-5,which_line='all lyman',wave_cut_off=2.0):
 
+    """
+    Given a wavelength array and parameters (H column density, b value, and 
+    velocity centroid), computes the Voigt profile of HI and DI Lyman-alpha
+    and returns the combined absorption profile.
+
+    """
+
+    ##### ISM absorbers #####
+
+    if which_line == 'h1_d1':
+
+        ## HI ##
+   
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'h1',wave_cut_off=wave_cut_off)
+        tauh1=np.interp(wave_to_fit,hwave_all,htau_all)
+
+        ## DI ##
+
+        d1_col = np.log10( (10.**h1_col)*d2h )
+
+        dwave_all,dtau_all=tau_profile(d1_col,h1_vel,h1_b/np.sqrt(2.),'d1',wave_cut_off=wave_cut_off)
+        taud1=np.interp(wave_to_fit,dwave_all,dtau_all)
+
+
+        ## Adding the optical depths and creating the observed profile ##
+
+        tot_tau = tauh1 + taud1
+        tot_ism = np.exp(-tot_tau)
+
+    elif which_line =='heii':
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'heii',wave_cut_off=wave_cut_off)
+        tau_heii=np.interp(wave_to_fit,hwave_all,htau_all)
+
+        tot_ism = np.exp(-tau_heii)
+
+
+    else:
+
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'h1',wave_cut_off=wave_cut_off)
+        tauh1=np.interp(wave_to_fit,hwave_all,htau_all)
+
+
+        d1_col = np.log10( (10.**h1_col)*d2h )
+
+        dwave_all,dtau_all=tau_profile(d1_col,h1_vel,h1_b/np.sqrt(2.),'d1',wave_cut_off=wave_cut_off)
+        taud1=np.interp(wave_to_fit,dwave_all,dtau_all)
+
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly_beta',wave_cut_off=wave_cut_off)
+        tau_lyb=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly_gamma',wave_cut_off=wave_cut_off)
+        tau_lyg=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly_delta',wave_cut_off=wave_cut_off)
+        tau_lyd=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly_epsilon',wave_cut_off=wave_cut_off)
+        tau_lye=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly6',wave_cut_off=wave_cut_off)
+        tau_ly6=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly7',wave_cut_off=wave_cut_off)
+        tau_ly7=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly8',wave_cut_off=wave_cut_off)
+        tau_ly8=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly9',wave_cut_off=wave_cut_off)
+        tau_ly9=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly10',wave_cut_off=wave_cut_off)
+        tau_ly10=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly11',wave_cut_off=wave_cut_off)
+        tau_ly11=np.interp(wave_to_fit,hwave_all,htau_all)
+        hwave_all,htau_all=tau_profile(h1_col,h1_vel,h1_b,'ly12',wave_cut_off=wave_cut_off)
+        tau_ly12=np.interp(wave_to_fit,hwave_all,htau_all)
+        
+
+
+        tot_tau = tauh1 + taud1 + tau_lyb + tau_lyg + tau_lyd + tau_lye + tau_ly6 + tau_ly7 + tau_ly8 + tau_ly9 + tau_ly10 + tau_ly11 + tau_ly12
+        tot_ism = np.exp(-tot_tau)
+
+
+    return tot_ism
+
+
+def tau_profile(ncols,vshifts,vdop,which_line,wave_cut_off=2.0):
+
+    """ 
+    Computes a Lyman-alpha Voigt profile for HI or DI given column density,
+    velocity centroid, and b parameter.
+
+    """
+
+    ## defining rest wavelength, oscillator strength, and damping parameter
+    if which_line == 'h1':
+        lam0s,fs,gammas=1215.67,0.4161,6.26e8
+    elif which_line == 'd1':
+        lam0s,fs,gammas=1215.3394,0.4161,6.27e8
+    elif which_line == 'mg2_h':
+        lam0s,fs,gammas=2796.3543,6.155E-01,2.625E+08
+    elif which_line == 'mg2_k':
+        lam0s,fs,gammas=2803.5315,3.058E-01,2.595E+08
+    elif which_line == 'ly_beta':
+        lam0s,fs,gammas=1025.7222,7.914e-2,1.897e8
+    elif which_line == 'ly_gamma':
+        lam0s,fs,gammas=972.5367,2.901E-02,8.127e7
+    elif which_line == 'ly_delta':
+        lam0s,fs,gammas=949.7430,1.395E-02,4.204E+07
+    elif which_line == 'ly_epsilon':
+        lam0s,fs,gammas=937.8034,7.803E-03,2.450E+07
+    elif which_line == 'ly6':
+        lam0s,fs,gammas=930.7482,4.816E-03,1.450E+07
+    elif which_line == 'ly7':
+        lam0s,fs,gammas=926.2256,3.185E-03,8.450E+06
+    elif which_line == 'ly8':
+        lam0s,fs,gammas=923.1503,2.217E-03,4.450E+06
+    elif which_line == 'ly9':
+        lam0s,fs,gammas=920.9630,1.606E-03,2.450E+06
+    elif which_line == 'ly10':
+        lam0s,fs,gammas=919.3513,1.201E-03,1.450E+06
+    elif which_line == 'ly11':
+        lam0s,fs,gammas=918.1293,9.219E-04,8E+05
+    elif which_line == 'ly12':
+        lam0s,fs,gammas=917.1805,7.231E-04,4e5
+    elif which_line == 'heii':
+        lam0s,fs,gammas=303.780409484,0.41629,1e8
+
+    else:
+        raise ValueError("which_line can only equal 'h1' or 'd1'!")
+
+    Ntot=10.**ncols  # column density of H I gas
+    nlam=4000       # number of elements in the wavelength grid
+    xsections_onesided=np.zeros(nlam)  # absorption cross sections as a 
+                                       # fun<D-O>ction of wavelength (one side of transition)
+    u_parameter=np.zeros(nlam)  # Voigt "u" parameter
+    nu0s=ccgs/(lam0s*1e-8)  # wavelengths of Lyman alpha in frequency
+    nuds=nu0s*vdop/c_km    # delta nus based off vdop parameter
+    a_parameter = np.abs(gammas/(4.*np.pi*nuds) ) # Voigt "a" parameter -- damping parameter
+    xsections_nearlinecenter = np.sqrt(np.pi)*(e**2)*fs*lam0s/(me*ccgs*vdop*1e13)  # cross-sections 
+                                                                           # near Lyman line center
+
+    
+    wave_edge=lam0s - wave_cut_off # define wavelength cut off - this is important for the brightest lines and should be increased appropriately.
+    wave_symmetrical=np.zeros(2*nlam-1) # huge wavelength array centered around a Lyman transition
+    wave_onesided = np.zeros(nlam)  # similar to wave_symmetrical, but not centered 
+                                    # around a Lyman transition 
+    lamshifts=lam0s*vshifts/c_km  # wavelength shifts from vshifts parameter
+
+    ## find end point for wave_symmetrical array and create wave_symmetrical array
+    num_elements = 2*nlam - 1
+    first_point = wave_edge
+ 
+    mid_point = lam0s
+    end_point = 2*(mid_point - first_point) + first_point
+    wave_symmetrical = np.linspace(first_point,end_point,num=num_elements)
+    wave_onesided = np.linspace(lam0s,wave_edge,num=nlam)
+
+    freq_onesided = ccgs / (wave_onesided*1e-8)  ## convert "wave_onesided" array to a frequency array
+
+    u_parameter = (freq_onesided-nu0s)/nuds  ## Voigt "u" parameter -- dimensionless frequency offset
+
+    xsections_onesided=xsections_nearlinecenter*voigt.voigt(a_parameter,u_parameter)  ## cross-sections
+                                                                                # single sided
+                                                                                ## can't do symmetrical 
+
+    xsections_onesided_flipped = xsections_onesided[::-1]
+    
+    		
+    ## making the cross-sections symmetrical
+    xsections_symmetrical=np.append(xsections_onesided_flipped[0:nlam-1],xsections_onesided) 
+    deltalam=np.max(wave_symmetrical)-np.min(wave_symmetrical)
+    dellam=wave_symmetrical[1]-wave_symmetrical[0] 
+    nall=np.round(deltalam/dellam)
+    wave_all=deltalam*(np.arange(nall)/(nall-1))+wave_symmetrical[0]
+
+    tau_all = np.interp(wave_all,wave_symmetrical+lamshifts,xsections_symmetrical*Ntot)
+
+    return wave_all,tau_all
+
+
+h1_vel = 0
+wave = np.arange(50,1230,0.25)
+wave_heii = np.arange(280,320,0.001)
+wave_lya = np.arange(913,1230,0.01)
 rel_he1 = 0.08
 frac_he2 = 0.6
 
 h1_cols = np.array([17.5, 18.0, 18.5, 19.0])
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+fig = plt.figure(figsize=(14,5))
+ax = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
 
 for i in range(len(h1_cols)):
 
     atten = total_tau_profile_func_euv(wave,h1_cols[i],h1_vel,rel_he1=rel_he1,frac_he2=frac_he2,which_line='all')
-    ax.plot(wave,atten,label=str(h1_cols[i]))
+    lya_atten = total_tau_profile_func(wave_lya,h1_cols[i],10.8,0,wave_cut_off=10.,d2h=1.56e-5,which_line='all lyman')
+    heii_atten = total_tau_profile_func(wave_heii,np.log10(10**(h1_cols[i])*rel_he1*frac_he2),8,0,wave_cut_off=10.,which_line='heii')
+    ax.plot(wave,atten,label=str(h1_cols[i]),color='C'+str(i))
+    #ax.plot(wave_lya,lya_atten,color='C'+str(i),label=str(h1_cols[i]))
+    #ax.plot(wave_heii,heii_atten,color='m',linewidth=0.5)
+
+    ax2.plot(wave_lya,lya_atten,color='C'+str(i),label=str(h1_cols[i]))
+
+
+if True:
+
+    hi_lyman_series = np.array([1215.67,1025.7222,972.5367,949.7430,937.8034,930.7482,926.2256,923.1503,920.9630,919.3513,918.1293,917.1805,
+                        916.4291, 915.8238, 915.3289, 914.9192, 914.5762,914.2861,914.0385,913.8256,913.6411, 913.4803,913.3391,913.2146,913.1042,913.0059,
+                           912.9179,912.8389,912.7676,912.7032])
+
+    heii_lyman_series = hi_lyman_series / 4.
+
+    hei_strong_lines = np.array([584.3339, 537.0293, 522.186, 515.596, 512.07, 509.97, 508.63, 507.71, 507.08, 506.56,506.31,505.90,505.75,505.61])
+
+    hei_autoionization_lines = np.array([205.885, 194.675, 192.257, 191.227])
+
+    tickmark_bottom_hi_lyman = 1.02
+    tickmark_top_hi_lyman = 1.2
+    tickmark_bottom_heii_lyman = 1.02
+    tickmark_top_heii_lyman = 1.2
+
+    for i in range(len(hi_lyman_series)):
+
+        ax.annotate('', xy=(hi_lyman_series[i], tickmark_bottom_hi_lyman), xycoords='data', xytext=(hi_lyman_series[i], tickmark_top_hi_lyman), 
+            arrowprops=dict(arrowstyle="-", color='r'))
+        ax.annotate('', xy=(heii_lyman_series[i], tickmark_bottom_heii_lyman), xycoords='data', xytext=(heii_lyman_series[i], tickmark_top_heii_lyman), 
+            arrowprops=dict(arrowstyle="-", color='b'))
+
+    for i in range(len(hei_strong_lines)):
+
+        ax.annotate('', xy=(hei_strong_lines[i], tickmark_bottom_hi_lyman), xycoords='data', xytext=(hei_strong_lines[i], tickmark_top_hi_lyman), 
+            arrowprops=dict(arrowstyle="-", color='g'))
+
+    for i in range(len(hei_autoionization_lines)):
+
+        ax.annotate('', xy=(hei_autoionization_lines[i], tickmark_bottom_hi_lyman), xycoords='data', xytext=(hei_autoionization_lines[i], tickmark_top_hi_lyman), 
+            arrowprops=dict(arrowstyle="-", color='m'))
+
 
 ax.set_xlabel('Wavelength (\AA)',fontsize=18)
 ax.set_ylabel('Transmission Fraction', fontsize=18)
-ax.legend(loc=3,title='log$_{10}$ N(HI)')
+ax.legend(loc=4,title='log$_{10}$ N(HI)')
+
+ax2.set_xlabel('Wavelength (\AA)',fontsize=18)
 
 ax.set_yscale('log')
-ax.set_ylim([1e-2,1.1])
-ax.set_xlim([50,950])
+ax.set_ylim([1e-2,1.2])
+ax.set_xlim([50,1230])#950])
 ax.minorticks_on()
 
-ax.vlines(229,1e-2,1.1,color='gray',linestyle=':')
-ax.vlines(504,1e-2,1.1,color='gray',linestyle=':')
-ax.vlines(911,1e-2,1.1,color='gray',linestyle=':')
+ax2.set_xlim([1214,1217.2])
+ax2.minorticks_on()
+
+ax3 = ax2.twiny()
+ax3.set_xlim([(1214-1215.67)/1215.67*3e5,(1217.2-1215.67)/1215.67*3e5])
+ax3.set_xlabel('Velocity relative to Ly$\\alpha$ rest wavelength (km s$^{-1}$)',fontsize=18)
+
+lw=3
+ax.vlines(229,1e-2,1.2,color='gray',linestyle=':',linewidth=lw)
+ax.vlines(504,1e-2,1.2,color='gray',linestyle=':',linewidth=lw)
+ax.vlines(911,1e-2,1.2,color='gray',linestyle=':',linewidth=lw)
 
 ax.annotate('He II',(229,0.1),rotation=90, fontsize=14, va='bottom', ha='right')
 ax.annotate('He I',(504,0.1),rotation=90, fontsize=14, va='bottom', ha='right')

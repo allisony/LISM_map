@@ -8,6 +8,9 @@ from scipy.stats import skewnorm
 from scipy.stats.mstats import mquantiles
 from scipy.optimize import fsolve
 import scipy.stats as STS
+from astropy.coordinates import SkyCoord
+import astropy.coordinates as coord
+from astropy import units as u
 ## Pretty plot setup ###################################
 plt.ion()
 
@@ -137,7 +140,7 @@ def estSkewNorm(xin,conf=(0.16,0.5,0.84),Guess=None,Mode='Med',Check=True):
 
 
 ## Read in the data -- see format_spreadsheet.py ###
-df = pd.read_csv('targets/NHI_data_July2024.csv')
+df = pd.read_csv('targets/NHI_data_February2025_fixed.csv')
 ####################################################
 
 
@@ -145,46 +148,42 @@ fig = plt.figure(figsize=(12,5))
 ax = fig.add_subplot(121)
 ax2 = fig.add_subplot(122)
 
+
+c = SkyCoord(np.asarray(df['RA'])*u.deg, np.asarray(df['DEC'])*u.deg)
+
 #mask1 = df['RA'] >0 #(df['RA'] < 180.) & (df['DEC'] > 0)
-quadrant1 = (df['RA'] > 180.) & (df['DEC'] > 0)
-quadrant2 = (df['RA'] > 180.) & (df['DEC'] <= 0)
-quadrant3 = (df['RA'] <= 180.) & (df['DEC'] > 0)
-quadrant4 = (df['RA'] <= 180.) & (df['DEC'] <= 0)
+quadrant1 = (c.galactic.l.value > 180.) & (c.galactic.b.value > 0)
+quadrant2 = (c.galactic.l.value > 180.) & (c.galactic.b.value <= 0)
+quadrant3 = (c.galactic.l.value <= 180.) & (c.galactic.b.value > 0)
+quadrant4 = (c.galactic.l.value <= 180.) & (c.galactic.b.value <= 0)
 
 #ax.errorbar(df['distance (pc)'][mask1], df['N(HI)'][mask1], xerr=df['distance error'][mask1], yerr=df['N(HI) uncertainty'][mask1], fmt='o', color='dodgerblue', ecolor='k', mec='k')
-ax.errorbar(df['distance (pc)'][quadrant1], df['N(HI)'][quadrant1], xerr=df['distance error'][quadrant1], yerr=df['N(HI) uncertainty'][quadrant1], fmt='o', color='C0', ecolor='k', mec='k',label='NE')
-ax.errorbar(df['distance (pc)'][quadrant2], df['N(HI)'][quadrant2], xerr=df['distance error'][quadrant2], yerr=df['N(HI) uncertainty'][quadrant2], fmt='o', color='C1', ecolor='k', mec='k',label='SE')
-ax.errorbar(df['distance (pc)'][quadrant3], df['N(HI)'][quadrant3], xerr=df['distance error'][quadrant3], yerr=df['N(HI) uncertainty'][quadrant3], fmt='o', color='C2', ecolor='k', mec='k',label='NW')
-ax.errorbar(df['distance (pc)'][quadrant4], df['N(HI)'][quadrant4], xerr=df['distance error'][quadrant4], yerr=df['N(HI) uncertainty'][quadrant4], fmt='o', color='C3', ecolor='k', mec='k',label='SW')
+ax.errorbar(df['distance (pc)'][quadrant1], df['N(HI)'][quadrant1], xerr=df['distance error'][quadrant1], yerr=df['N(HI) uncertainty adjusted'][quadrant1], fmt='o', color='C0', ecolor='k', mec='k',label='NE')
+ax.errorbar(df['distance (pc)'][quadrant2], df['N(HI)'][quadrant2], xerr=df['distance error'][quadrant2], yerr=df['N(HI) uncertainty adjusted'][quadrant2], fmt='o', color='C1', ecolor='k', mec='k',label='SE')
+ax.errorbar(df['distance (pc)'][quadrant3], df['N(HI)'][quadrant3], xerr=df['distance error'][quadrant3], yerr=df['N(HI) uncertainty adjusted'][quadrant3], fmt='o', color='C2', ecolor='k', mec='k',label='NW')
+ax.errorbar(df['distance (pc)'][quadrant4], df['N(HI)'][quadrant4], xerr=df['distance error'][quadrant4], yerr=df['N(HI) uncertainty adjusted'][quadrant4], fmt='o', color='C3', ecolor='k', mec='k',label='SW')
 
 
-d1 = df['distance (pc)'] <= 5.
-d2 = (df['distance (pc)'] > 5.) & (df['distance (pc)'] <= 10.)
-d3 = (df['distance (pc)'] > 10.) & (df['distance (pc)'] <= 50.)
-d4 = (df['distance (pc)'] > 50.) & (df['distance (pc)'] <= 100.)
+ax.legend(title="Sky quadrants")
 
 lw=5
 a=0.5
 
-ax.hlines(np.mean(df['N(HI)'][quadrant1 & d1]),0,5, color='C0',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant1 & d2]),5,10, color='C0',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant1 & d3]),10,50, color='C0',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant1 & d4]),50,100, color='C0',alpha=a,linewidth=lw)
 
-ax.hlines(np.mean(df['N(HI)'][quadrant2 & d1]),0,5, color='C1',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant2 & d2]),5,10, color='C1',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant2 & d3]),10,50, color='C1',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant2 & d4]),50,100, color='C1',alpha=a,linewidth=lw)
+quadrants = [quadrant1, quadrant2, quadrant3, quadrant4]
+distance_shells = np.array([0,10,50,100])
 
-ax.hlines(np.mean(df['N(HI)'][quadrant3 & d1]),0,5, color='C2',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant3 & d2]),5,10, color='C2',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant3 & d3]),10,50, color='C2',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant3 & d4]),50,100, color='C2',alpha=a,linewidth=lw)
+for q in range(len(quadrants)):
 
-ax.hlines(np.mean(df['N(HI)'][quadrant4 & d1]),0,5, color='C3',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant4 & d2]),5,10, color='C3',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant4 & d3]),10,50, color='C3',alpha=a,linewidth=lw)
-ax.hlines(np.mean(df['N(HI)'][quadrant4 & d4]),50,100, color='C3',alpha=a,linewidth=lw)
+    for d in range(len(distance_shells)-1):
+
+        distance_mask = (df['distance (pc)'] > distance_shells[d]) &  (df['distance (pc)'] <= distance_shells[d+1])
+        weighted_average = np.average(df['N(HI)'][quadrants[q] & distance_mask], 
+                                    weights=1./(df['N(HI) uncertainty adjusted'][quadrants[q] & distance_mask])**2)
+        ax.hlines(weighted_average,distance_shells[d],distance_shells[d+1], 
+                            color='C' + str(q),alpha=a,linewidth=lw)
+
+
 
 print(np.mean(df['N(HI)']), np.std(df['N(HI)']))
 
@@ -193,6 +192,16 @@ print(np.mean(df['N(HI)'][quadrant2]), np.std(df['N(HI)'][quadrant2]))
 print(np.mean(df['N(HI)'][quadrant3]), np.std(df['N(HI)'][quadrant3]))
 print(np.mean(df['N(HI)'][quadrant4]), np.std(df['N(HI)'][quadrant4]))
 
+distance_shells = np.array([0,10,20,30,50,70,100])
+for d in range(len(distance_shells)-1):
+    distance_mask = (df['distance (pc)'] > distance_shells[d]) &  (df['distance (pc)'] <= distance_shells[d+1])
+    weighted_average = np.average(df['N(HI)'][distance_mask], weights=1./(df['N(HI) uncertainty adjusted'][distance_mask])**2)
+    average = np.mean(df['N(HI)'][distance_mask])
+    median = np.median(df['N(HI)'][distance_mask])
+                                                                                                          
+    print(d, np.round(weighted_average,2), np.round(average,2),np.round(median,2))
+
+
 ax.set_xlabel('Distance (pc)', fontsize=fs)
 ax.set_ylabel('log$_{10}$[N(HI)/cm$^{-2}$]', fontsize=fs)
 ax.set_xscale('log')
@@ -200,12 +209,22 @@ ax.set_xscale('log')
 
 ax.minorticks_on()
 
-## n(HI) = 0.1, 0.01 lines
+## n(HI) = 0.1, 0.01 lines - ADD LABELS!
 d = np.arange(1,110,10)
 ax.plot(d, np.log10(1.0 * d * 3.09e18), linestyle='--', color='gray')
 ax.plot(d, np.log10(0.1 * d * 3.09e18), linestyle='--', color='gray')
 ax.plot(d, np.log10(0.01 * d * 3.09e18), linestyle='--', color='gray')
 ax.plot(d, np.log10(0.001 * d * 3.09e18), linestyle='--', color='gray')
+
+rotation=34
+fontsize=10
+color='dimgray'
+ax.annotate('1 cm$^{-3}$',xy=(1,18.56),fontsize=fontsize,rotation=rotation,color=color)
+ax.annotate('0.1 cm$^{-3}$',xy=(1,17.56),fontsize=fontsize,rotation=rotation,color=color)
+#ax.annotate('cm$^{-3}$',xy=(1,17.42),fontsize=fontsize,rotation=rotation,color=color)
+ax.annotate('0.01 cm$^{-3}$',xy=(3,17.04),fontsize=fontsize,rotation=rotation,color=color)
+ax.annotate('0.001 cm$^{-3}$',xy=(30,17.04),fontsize=fontsize,rotation=rotation,color=color)
+
 
 ax.set_xlim([1,100])
 ax.set_ylim([17,19.7])
@@ -213,7 +232,6 @@ ax.set_ylim([17,19.7])
 
 
 
-## distance shell averages? (add in area-weighting later! or not) # 3/10/24 - add in quadrants??
 nHI = 10**(df['N(HI)']) / (df['distance (pc)'] * 3.09e18)
 
 d_avgs = np.logspace(0,2,15)
@@ -241,10 +259,10 @@ for i in range(len(d_bins)):
 ax2.step(d_bins,nHI_avgs,where='mid', color='k')
 ax2.errorbar(d_bins, nHI_avgs, yerr=[nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs], fmt='none', ecolor='k') 
 ax2.set_xlabel('Distance (pc)', fontsize=fs)
-ax2.set_ylabel('n(HI) (cm$^{-3}$)', fontsize=fs)
+ax2.set_ylabel('$\\bar{n}$(HI) (cm$^{-3}$)', fontsize=fs)
 ax2.set_xscale('log')
 
-np.savetxt('nHI_averages_with_distance.txt',np.transpose(np.array([d_bins, nHI_avgs, nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs]))) ## Now need to fit with MCMC? Maybe something simpler is warranted, just scipy optimize? Given that we're not dividing up by quadrant. 
+np.savetxt('nHI_averages_with_distance.txt',np.transpose(np.array([d_bins, nHI_avgs, nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs])))  
 ###############
 
 fig.subplots_adjust(left=0.08, right=0.97, top=0.97, bottom=0.13, wspace=0.25)
@@ -329,16 +347,20 @@ for i in range(len(d_bins)):
 
 
 #####
-ax2.plot(d_bins,nHI_avgs_1,'o', color='C0',mec='k',label='NE')
-ax2.plot(d_bins,nHI_avgs_2,'o', color='C1',mec='k',label='SE')
-ax2.plot(d_bins,nHI_avgs_3,'o', color='C2',mec='k',label='NW')
-ax2.plot(d_bins,nHI_avgs_4,'o', color='C3',mec='k',label='SW')
+ax2.plot(d_bins,nHI_avgs_1,'o', color='C0',mec='k')#,label='NE')
+ax2.plot(d_bins,nHI_avgs_2,'o', color='C1',mec='k')#,label='SE')
+ax2.plot(d_bins,nHI_avgs_3,'o', color='C2',mec='k')#,label='NW')
+ax2.plot(d_bins,nHI_avgs_4,'o', color='C3',mec='k')#,label='SW')
 
-ax2.legend(title="Sky quadrants")
+#ax2.legend(title="Sky quadrants")
 
 #ax2.errorbar(d_bins, nHI_avgs, yerr=[nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs], fmt='none', ecolor='k')
 
+plot_all=False
 
+fine_d_array = np.append(np.linspace(0,1,100),np.logspace(0,2,200))
+alpha=0.8
+linewidth=3
 
 def radial_model(d_array,max_value, max_distance):
 
@@ -348,22 +370,6 @@ def radial_model(d_array,max_value, max_distance):
 
     return nhi_array
 
-def grab_random_value(x):
-
-    # first drop nans
-    x = x[~np.isnan(x)]
-
-    return x[np.random.randint(len(x))]
-
-def generate_random_nhi_array(df,useindices=['0','1','2','3','4','5','6','7','8','9','10','11','12','13']):
-
-    random_nhi_array = np.zeros(len(useindices))
-
-    for i in range(len(useindices)):
-
-        random_nhi_array[i] = grab_random_value(np.array(df[useindices[i]]))
-
-    return random_nhi_array
 
 
 
@@ -378,9 +384,9 @@ model_1_components = Model(fit_model_1_components)
 
 
 model_1_components.set_param_hint('mv1', value = 0.1,
-               min=0.06,max=0.12,vary=True) 
-model_1_components.set_param_hint('md1', value = 1.5,
-               min=1,max=5,vary=True) 
+               min=0.06,max=0.5,vary=True) 
+model_1_components.set_param_hint('md1', value = 0.5,
+               min=0,max=1,vary=True) 
 
 
 
@@ -391,8 +397,19 @@ model_1_components.print_param_hints()
 initial_model_profile_1_components = model_1_components.eval(params, d_array=d_bins)
 
 
-result_1_components = model_1_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
+result_1_components = model_1_components.fit(nHI_avgs, d_array=d_bins)#, weights=1./unc) # weights need fixing!
+print(" ")
+print("1 Component")
 print(result_1_components.fit_report())
+fit_1_components = fit_model_1_components(fine_d_array, result_1_components.best_values['mv1'], result_1_components.best_values['md1'])
+
+if True:
+    ax2.plot(fine_d_array,fit_1_components,color='C0',label='1 component',alpha=alpha,linewidth=linewidth,linestyle='--')
+
+print("End 1 Component")
+print(" ")
+
+
 
 
 
@@ -409,14 +426,14 @@ model_2_components = Model(fit_model_2_components)
 
 
 model_2_components.set_param_hint('mv1', value = 0.1,
-               min=0.06,max=0.12,vary=True) 
-model_2_components.set_param_hint('md1', value = 1.5,
-               min=1,max=3,vary=True) 
+               min=0.06,max=0.3,vary=True) 
+model_2_components.set_param_hint('md1', value = 0.5,
+               min=0,max=1,vary=True) 
 
 model_2_components.set_param_hint('mv2', value = 0.06,
-               min=0.02,max=0.10,vary=True) 
+               min=0.02,max=0.20,vary=True) 
 model_2_components.set_param_hint('md2', value = 3,
-               min=1.5,max=5,vary=True) 
+               min=1,max=5,vary=True) 
 
 
 
@@ -427,11 +444,16 @@ model_2_components.print_param_hints()
 initial_model_profile_2_components = model_2_components.eval(params, d_array=d_bins)
 
 
-result_2_components = model_2_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
+result_2_components = model_2_components.fit(nHI_avgs, d_array=d_bins)#, weights=1./unc) # weights need fixing!
+print(" ")
+print("2 Component")
 print(result_2_components.fit_report())
-fit_2_components = fit_model_2_components(d_bins[2:], result_2_components.best_values['mv1'], result_2_components.best_values['md1'], result_2_components.best_values['mv2'],  result_2_components.best_values['md2'])
-#ax2.plot(d_bins[2:],fit_2_components,color='b')
+fit_2_components = fit_model_2_components(fine_d_array, result_2_components.best_values['mv1'], result_2_components.best_values['md1'], result_2_components.best_values['mv2'],  result_2_components.best_values['md2'])
+if plot_all:
+    ax2.plot(fine_d_array,fit_2_components,color='C1',label='2 component',alpha=alpha,linewidth=linewidth,linestyle='--')
 
+print("End 2 Component")
+print(" ")
 
 
 
@@ -448,19 +470,19 @@ model_3_components = Model(fit_model_3_components)
 
 
 model_3_components.set_param_hint('mv1', value = 0.1,
-               min=0.06,max=0.12,vary=True) 
-model_3_components.set_param_hint('md1', value = 1.5,
-               min=1,max=3,vary=True) 
+               min=0.005,max=0.2,vary=True) 
+model_3_components.set_param_hint('md1', value = 0.5,
+               min=0,max=1,vary=True) 
 
 model_3_components.set_param_hint('mv2', value = 0.06,
-               min=0.02,max=0.10,vary=True) 
+               min=0.005,max=0.2,vary=True) 
 model_3_components.set_param_hint('md2', value = 3,
-               min=1.5,max=5,vary=True) 
+               min=1,max=5,vary=True) 
 
 model_3_components.set_param_hint('mv3', value = 0.02,
-               min=0.0001,max=0.06,vary=True) 
+               min=0.0001,max=0.1,vary=True) 
 model_3_components.set_param_hint('md3', value = 10.5,
-               min=5,max=20,vary=True) 
+               min=1,max=50,vary=True) 
 
 
 
@@ -470,12 +492,18 @@ model_3_components.print_param_hints()
 initial_model_profile_3_components = model_3_components.eval(params, d_array=d_bins)
 
 
-result_3_components = model_3_components.fit(nHI_avgs[2:], d_array=d_bins[2:])#, weights=1./unc) # weights need fixing!
+result_3_components = model_3_components.fit(nHI_avgs, d_array=d_bins)#, weights=1./unc) # weights need fixing!
+print(" ")
+print("3 Component")
+
 print(result_3_components.fit_report())
 
-fit_3_components = fit_model_3_components(d_bins[2:], result_2_components.best_values['mv1'], result_2_components.best_values['md1'], result_2_components.best_values['mv2'],  result_2_components.best_values['md2'],result_3_components.best_values['mv3'], result_3_components.best_values['md3'])
-#ax2.plot(d_bins[2:],fit_3_components,color='g')
+fit_3_components = fit_model_3_components(fine_d_array, result_3_components.best_values['mv1'], result_3_components.best_values['md1'], result_3_components.best_values['mv2'],  result_3_components.best_values['md2'],result_3_components.best_values['mv3'], result_3_components.best_values['md3'])
 
+ax2.plot(fine_d_array,fit_3_components,color='r',linewidth=3,linestyle='--',label='3 component',alpha=alpha)
+
+print("End 3 Component")
+print(" ")
 
 
 
@@ -494,24 +522,24 @@ model_4_components = Model(fit_model_4_components)
 
 
 model_4_components.set_param_hint('mv1', value = 0.1,
-               min=0.06,max=0.12,vary=True) 
-model_4_components.set_param_hint('md1', value = 1.5,
-               min=1,max=3,vary=True) 
+               min=0.06,max=0.3,vary=True) 
+model_4_components.set_param_hint('md1', value = 0.5,
+               min=0,max=1,vary=True) 
 
 model_4_components.set_param_hint('mv2', value = 0.06,
-               min=0.02,max=0.10,vary=True) 
+               min=0.01,max=0.20,vary=True) 
 model_4_components.set_param_hint('md2', value = 3,
-               min=1.5,max=5,vary=True) 
+               min=1,max=5,vary=True) 
 
 model_4_components.set_param_hint('mv3', value = 0.02,
-               min=0.0001,max=0.06,vary=True) 
+               min=0.0001,max=0.1,vary=True) 
 model_4_components.set_param_hint('md3', value = 10.5,
-               min=5,max=20,vary=True) 
+               min=1,max=20,vary=True) 
 
 model_4_components.set_param_hint('mv4', value = 0.006,
-               min=0.00001,max=0.02,vary=True) 
+               min=0.00001,max=0.1,vary=True) 
 model_4_components.set_param_hint('md4', value = 80,
-               min=50,max=100,vary=True) 
+               min=1,max=90,vary=True) 
 
 params = model_4_components.make_params()
 model_4_components.print_param_hints()
@@ -521,11 +549,19 @@ initial_model_profile_4_components = model_4_components.eval(params, d_array=d_b
 unc = np.mean([nHI_avgs-nHI_68p_low,nHI_68p_high-nHI_avgs],axis=0)
 unc[1] = unc[0]
 
-result_4_components = model_4_components.fit(nHI_avgs[1:], d_array=d_bins[1:])#, weights=1./unc) # weights need fixing!
+result_4_components = model_4_components.fit(nHI_avgs, d_array=d_bins)#, weights=1./unc) # weights need fixing!
+print(" ")
+print("4 Component")
+
 print(result_4_components.fit_report())
 
-fit_4_components = fit_model_4_components(d_bins[1:], result_4_components.best_values['mv1'], result_4_components.best_values['md1'], result_4_components.best_values['mv2'],  result_4_components.best_values['md2'], result_4_components.best_values['mv3'], result_4_components.best_values['md3'], result_4_components.best_values['mv4'], result_4_components.best_values['md4'])
-ax2.plot(d_bins[1:],fit_4_components,color='r',linewidth=3)
+fit_4_components = fit_model_4_components(fine_d_array, result_4_components.best_values['mv1'], result_4_components.best_values['md1'], result_4_components.best_values['mv2'],  result_4_components.best_values['md2'], result_4_components.best_values['mv3'], result_4_components.best_values['md3'], result_4_components.best_values['mv4'], result_4_components.best_values['md4'])
+if plot_all:
+    ax2.plot(fine_d_array,fit_4_components,color='C2',label='4 component',alpha=alpha,linewidth=linewidth,linestyle='--')
+
+print("End 4 Component")
+print(" ")
+
 
 def fit_model_5_components(d_array, mv1, md1, mv2, md2, mv3, md3, mv4, md4, mv5, md5):
 
@@ -543,30 +579,30 @@ model_5_components = Model(fit_model_5_components)
 
 
 model_5_components.set_param_hint('mv1', value = 0.1,
-               min=0.06,max=0.12,vary=True) 
-model_5_components.set_param_hint('md1', value = 1.5,
-               min=1,max=3,vary=True) 
+               min=0.06,max=0.3,vary=True) 
+model_5_components.set_param_hint('md1', value = 0.5,
+               min=0,max=1,vary=True) 
 
 model_5_components.set_param_hint('mv2', value = 0.06,
-               min=0.02,max=0.10,vary=True) 
+               min=0.01,max=0.2,vary=True) 
 model_5_components.set_param_hint('md2', value = 3,
-               min=1.5,max=5,vary=True) 
+               min=1,max=5,vary=True) 
 
 model_5_components.set_param_hint('mv3', value = 0.02,
-               min=0.0001,max=0.06,vary=True) 
+               min=0.0001,max=0.1,vary=True) 
 model_5_components.set_param_hint('md3', value = 10.5,
-               min=5,max=20,vary=True) 
+               min=1,max=20,vary=True) 
 
 model_5_components.set_param_hint('mv4', value = 0.006,
-               min=0.0001,max=0.04,vary=True) 
+               min=0.0001,max=0.1,vary=True) 
 model_5_components.set_param_hint('md4', value = 80,
-               min=15,max=30,vary=True) 
+               min=1,max=50,vary=True) 
 
 
 model_5_components.set_param_hint('mv5', value = 0.006,
-               min=0.00001,max=0.02,vary=True) 
+               min=0.00001,max=0.1,vary=True) 
 model_5_components.set_param_hint('md5', value = 80,
-               min=50,max=100,vary=True) 
+               min=1,max=90,vary=True) 
 
 
 params = model_5_components.make_params()
@@ -574,11 +610,36 @@ model_5_components.print_param_hints()
 
 initial_model_profile_5_components = model_5_components.eval(params, d_array=d_bins)
 
-result_5_components = model_5_components.fit(nHI_avgs[1:], d_array=d_bins[1:])#, weights=1./unc) # weights need fixing!
+result_5_components = model_5_components.fit(nHI_avgs, d_array=d_bins)#, weights=1./unc) # weights need fixing!
+
+print(" ")
+print("5 Component")
+
 print(result_5_components.fit_report())
 
-fit_5_components = fit_model_5_components(d_bins[1:], result_5_components.best_values['mv1'], result_5_components.best_values['md1'], result_5_components.best_values['mv2'],  result_5_components.best_values['md2'], result_5_components.best_values['mv3'], result_5_components.best_values['md3'], result_5_components.best_values['mv4'], result_5_components.best_values['md4'], result_5_components.best_values['mv5'], result_5_components.best_values['md5'])
-#ax2.plot(d_bins[1:],fit_5_components,color='g',linewidth=3)
+fit_5_components = fit_model_5_components(fine_d_array, result_5_components.best_values['mv1'], result_5_components.best_values['md1'], result_5_components.best_values['mv2'],  result_5_components.best_values['md2'], result_5_components.best_values['mv3'], result_5_components.best_values['md3'], result_5_components.best_values['mv4'], result_5_components.best_values['md4'], result_5_components.best_values['mv5'], result_5_components.best_values['md5'])
+if plot_all:
+    ax2.plot(fine_d_array,fit_5_components,color='C3',label='5 component',alpha=alpha,linewidth=linewidth,linestyle='--')
+
+
+print("End 5 Component")
+print(" ")
+
+
+print("BIC comparison")
+print(result_1_components.bic, result_2_components.bic, result_3_components.bic, result_4_components.bic, result_1_components.bic)
+
+ymin=0
+ymax=0.005
+ax2.vlines(result_3_components.best_values['md1'],ymin,ymax,color='k')
+ax2.vlines(result_3_components.best_values['md2'],ymin,ymax,color='k')
+ax2.vlines(result_3_components.best_values['md3'],ymin,ymax,color='k')
+
+
+ax2.legend()
+ax2.set_xlim([0.8,100])
+
+fig.savefig('NHI_distance.png',dpi=200)
 
 import pdb; pdb.set_trace()
 
@@ -594,15 +655,15 @@ best_fit_4_components = fit_model_4_components(d_array, **result_4_components.be
 best_fit_5_components = fit_model_5_components(d_array, **result_5_components.best_values)
 #ax2.plot(d_array,best_fit_5_components,'b-.',alpha=0.5,label='5 components')
 
-ax2.legend()
+#ax2.legend()
 
 
 
-alphas = np.zeros(len(nHI_avgs[2:]))
+alphas = np.zeros(len(nHI_avgs))
 locs = alphas.copy()
 scales = alphas.copy()
 debug=False
-for i in range(len(nHI_avgs[2:])):
+for i in range(len(nHI_avgs)):
 
     
     out = estSkewNorm([nHI_68p_low[i+2],nHI_avgs[i+2],nHI_68p_high[i+2]],conf=(0.159,0.5,0.841),Guess=None,Mode='Peak',Check=False)
@@ -625,7 +686,7 @@ for i in range(len(nHI_avgs[2:])):
 
 #sk=skewnorm.pdf(np.arange(0,10,0.01), out[2], loc=out[0], scale=out[1])
 
-nruns=100
+nruns=10
 
 mv1_1components = np.zeros(nruns)
 md1_1components = np.zeros(nruns)
@@ -937,3 +998,175 @@ ax2.plot(d_array,nhi_array1+nhi_array2+nhi_array3+nhi_array4,'r',alpha=a,label='
 
 
 #plt.savefig('NHI_distance.png')
+
+
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(111, projection="mollweide")
+
+nHI = (10**df['N(HI)'])/(df['distance (pc)']*3.09e18)
+nHI_uncertainty = df['N(HI) uncertainty'] * nHI * np.log(10)
+nHI_upper = (10**(df['N(HI)']+df['N(HI) uncertainty']))/(df['distance (pc)']*3.09e18)
+nHI_lower = (10**(df['N(HI)']-df['N(HI) uncertainty']))/(df['distance (pc)']*3.09e18)
+
+for i in range(len(df)):
+
+    if True:
+
+        c = SkyCoord(df['RA'].loc[i]*u.deg,df['DEC'].loc[i]*u.deg,frame='icrs')
+        l = c.galactic.l.value * np.pi/180.
+        b = c.galactic.b.value * np.pi/180.
+
+        phi_obs = coord.Angle(l * u.rad)
+        theta_obs = coord.Angle(b * u.rad)
+
+        phi_obs = phi_obs.wrap_at('180d', inplace=False)
+
+        if df['Instrument/Grating'].loc[i] == 'STIS/G140M':
+            color='r'
+        else:
+            color = 'k'
+
+    #if (nHI_upper[i] >= 0.1) & (df['distance (pc)'].loc[i] >4) & (df['distance (pc)'].loc[i] <25):
+    if (nHI_upper[i] >= 0.1)& (df['N(HI) uncertainty'][i] < 0.3) & (df['distance (pc)'].loc[i] >4) & (df['distance (pc)'].loc[i] <25):
+        color='r'
+        ax.scatter(-phi_obs,theta_obs,c=color,s=10000.*nHI[i]**2)
+
+
+        #ax.plot(-phi_obs,theta_obs,'o',color=color)
+        if df['Latex Name'].loc[i] == "GJ 678.1 A":
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value*0.8),rotation=0,color='b')
+        else:
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value),rotation=0,color='b')
+    elif (nHI_upper[i] < 0.1) & (df['N(HI) uncertainty'][i] < 0.3) & (df['distance (pc)'].loc[i] >4) & (df['distance (pc)'].loc[i] <25):
+        color='k'
+        ax.scatter(-phi_obs,theta_obs,c=color,s=10000.*nHI[i]**2)
+
+        if (df['Latex Name'].loc[i] == 'TRAPPIST-1'):
+
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*1.5,theta_obs.value),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'Capella'):
+
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*1.1,theta_obs.value*1.1),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'LTT 1445A') :
+
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value*1.1),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'GJ 3323'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*0.88,theta_obs.value),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'YZ CMi'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*0.9,theta_obs.value),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'HR 6748'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*-1,theta_obs.value),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'GJ 876'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value*1.05),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'HD 192310'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*2,theta_obs.value),rotation=0,fontsize=6,color='k')
+
+
+
+        else:
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value),rotation=0,fontsize=6,color='k')
+
+    elif (df['N(HI) uncertainty'][i] < 0.3) & (df['distance (pc)'].loc[i] <=4):
+        color='k'
+        ax.scatter(-phi_obs,theta_obs,c='w',s=10000.*nHI[i]**2,edgecolor='k')
+
+        #ax.plot(-phi_obs,theta_obs,'o',mfc='white',mec=color)
+        if(df['Latex Name'].loc[i] == "Barnard's Star"):
+
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*2,theta_obs.value),rotation=0,fontsize=6,color='k')
+
+        elif (df['Latex Name'].loc[i] == '$\epsilon$ Eri'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*0.9,theta_obs.value),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'Proxima Centauri'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value*2),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'GJ 411'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value*.97),rotation=0,fontsize=6,color='k')
+        elif (df['Latex Name'].loc[i] == 'GJ 15A'):
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value*1.15,theta_obs.value),rotation=0,fontsize=6,color='k')
+
+        else:
+            ax.annotate(df['Latex Name'].loc[i],(-phi_obs.value,theta_obs.value),rotation=0,fontsize=6,color='k')
+
+
+x_phi = coord.Angle(334. * u.deg)
+x_phi = x_phi.wrap_at('180d', inplace=False)
+x_theta = coord.Angle(6. * u.deg)
+ax.plot(-x_phi.radian,x_theta.radian,'x',ms=15,color='g')
+
+ax.grid(True)
+ax.set_xticklabels(['150$^{\circ}$','120$^{\circ}$','90$^{\circ}$','60$^{\circ}$','30$^{\circ}$','0$^{\circ}$','-30$^{\circ}$','-60$^{\circ}$','-90$^{\circ}$','-120$^{\circ}$','-150$^{\circ}$'])
+fig.subplots_adjust(bottom=0.05,top=0.99,right=0.95,left=0.05)
+
+fig.savefig('ring_plot.png',dpi=500)
+
+
+
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(111)
+
+nHI = (10**df['N(HI)'])/(df['distance (pc)']*3.09e18)
+
+for i in range(len(df)):
+
+    if nHI[i] > 0.1:
+
+        c = SkyCoord(df['RA'].loc[i]*u.deg,df['DEC'].loc[i]*u.deg,frame='icrs')
+        l = c.galactic.l.value #* np.pi/180.
+        b = c.galactic.b.value #* np.pi/180.
+
+        phi_obs = coord.Angle(l * u.rad)
+        theta_obs = coord.Angle(b * u.rad)
+
+        phi_obs = phi_obs.wrap_at('180d', inplace=False)
+
+        if df['Instrument/Grating'].loc[i] == 'STIS/G140M':
+            fmt='rs'
+        else:
+            fmt = 'ko'
+
+        ax.plot(l,b,fmt)
+        ax.annotate(df['Latex Name'].loc[i] + ' ' + str(np.round(df['distance (pc)'].loc[i],1)) + ' pc',(l,b))
+
+ax.invert_xaxis()
+
+
+
+
+nHI = (10**df['N(HI)'])/(df['distance (pc)']*3.09e18)
+
+l_obs_array = np.zeros(len(df))
+b_obs_array = l_obs_array.copy()
+
+marker_array = np.zeros(len(df),dtype=str)
+
+for i in range(len(df)):
+
+    if True:#nHI[i] > 0.1:
+
+        c = SkyCoord(df['RA'].loc[i]*u.deg,df['DEC'].loc[i]*u.deg,frame='icrs')
+        l_obs_array[i] = c.galactic.l.value * np.pi/180.
+        b_obs_array[i] = c.galactic.b.value * np.pi/180.
+        
+
+
+        
+phi_obs_array = coord.Angle(l_obs_array * u.rad).wrap_at('180d', inplace=False)
+theta_obs_array = coord.Angle(b_obs_array * u.rad)
+
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(111, projection="mollweide")
+
+#eee=ax.scatter(-phi_obs_array,theta_obs_array,c=np.log10(nHI),s=500/df['distance (pc)'],vmin=-2.7,vmax=-0.7,edgecolors='face')
+#d_mask = (df['distance (pc)'] > 5)
+#eee=ax.scatter(-phi_obs_array[d_mask],theta_obs_array[d_mask],c=nHI[d_mask],s=500/df['distance (pc)'][d_mask],vmin=.01,vmax=0.1,edgecolors='face')
+eee=ax.scatter(-phi_obs_array,theta_obs_array,c=nHI,s=500/df['distance (pc)'],vmin=.01,vmax=0.1,edgecolors='face')
+        #ax.annotate(df['Latex Name'].loc[i] + ' ' + str(np.round(df['distance (pc)'].loc[i],1)) + ' pc',(-phi_obs.value,theta_obs.value),rotation=45)
+ax.grid(True)
+ax.set_xticklabels(['150$^{\circ}$','120$^{\circ}$','90$^{\circ}$','60$^{\circ}$','30$^{\circ}$','0$^{\circ}$','-30$^{\circ}$','-60$^{\circ}$','-90$^{\circ}$','-120$^{\circ}$','-150$^{\circ}$'])
+
+cax=fig.add_axes([0.11, 0.06, 0.78, 0.02])
+
+cb=fig.colorbar(eee, orientation="horizontal",cax=cax)
+cb.set_label(label='n(HI)',size=20)
+
+
