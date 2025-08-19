@@ -140,7 +140,7 @@ def estSkewNorm(xin,conf=(0.16,0.5,0.84),Guess=None,Mode='Med',Check=True):
 
 
 ## Read in the data -- see format_spreadsheet.py ###
-df = pd.read_csv('targets/NHI_data_February2025_fixed.csv')
+df = pd.read_csv('targets/NHI_data_August2025.csv')
 ####################################################
 
 
@@ -403,7 +403,7 @@ print("1 Component")
 print(result_1_components.fit_report())
 fit_1_components = fit_model_1_components(fine_d_array, result_1_components.best_values['mv1'], result_1_components.best_values['md1'])
 
-if True:
+if False:
     ax2.plot(fine_d_array,fit_1_components,color='C0',label='1 component',alpha=alpha,linewidth=linewidth,linestyle='--')
 
 print("End 1 Component")
@@ -499,8 +499,8 @@ print("3 Component")
 print(result_3_components.fit_report())
 
 fit_3_components = fit_model_3_components(fine_d_array, result_3_components.best_values['mv1'], result_3_components.best_values['md1'], result_3_components.best_values['mv2'],  result_3_components.best_values['md2'],result_3_components.best_values['mv3'], result_3_components.best_values['md3'])
-
-ax2.plot(fine_d_array,fit_3_components,color='r',linewidth=3,linestyle='--',label='3 component',alpha=alpha)
+if False:
+    ax2.plot(fine_d_array,fit_3_components,color='r',linewidth=3,linestyle='--',label='3 component',alpha=alpha)
 
 print("End 3 Component")
 print(" ")
@@ -631,9 +631,9 @@ print(result_1_components.bic, result_2_components.bic, result_3_components.bic,
 
 ymin=0
 ymax=0.005
-ax2.vlines(result_3_components.best_values['md1'],ymin,ymax,color='k')
-ax2.vlines(result_3_components.best_values['md2'],ymin,ymax,color='k')
-ax2.vlines(result_3_components.best_values['md3'],ymin,ymax,color='k')
+#ax2.vlines(result_3_components.best_values['md1'],ymin,ymax,color='k')
+#ax2.vlines(result_3_components.best_values['md2'],ymin,ymax,color='k')
+#ax2.vlines(result_3_components.best_values['md3'],ymin,ymax,color='k')
 
 
 ax2.legend()
@@ -1091,7 +1091,16 @@ for i in range(len(df)):
 x_phi = coord.Angle(334. * u.deg)
 x_phi = x_phi.wrap_at('180d', inplace=False)
 x_theta = coord.Angle(6. * u.deg)
-ax.plot(-x_phi.radian,x_theta.radian,'x',ms=15,color='g')
+ax.scatter(-x_phi.radian,x_theta.radian,marker='x',s=250,color='g',linewidth=4)
+
+center = SkyCoord(ra=x_phi, dec=x_theta)
+pa = np.linspace(0, 360, 1000) * u.deg
+radius = 90 * u.deg
+circle_coords = center.directional_offset_by(position_angle=pa, separation=radius)
+circle_coords_ra_angle_wrap = coord.Angle(circle_coords.ra.deg*u.deg).wrap_at('180d', inplace=False)
+
+indices = np.argsort(circle_coords_ra_angle_wrap.radian)
+#ax.plot(-circle_coords_ra_angle_wrap.radian[indices], circle_coords.dec.radian[indices], linestyle='--',color='g')
 
 ax.grid(True)
 ax.set_xticklabels(['150$^{\circ}$','120$^{\circ}$','90$^{\circ}$','60$^{\circ}$','30$^{\circ}$','0$^{\circ}$','-30$^{\circ}$','-60$^{\circ}$','-90$^{\circ}$','-120$^{\circ}$','-150$^{\circ}$'])

@@ -15,7 +15,7 @@ def round_to_1(x, depth=2):
             factor = depth
         return round(x, factor)
 
-df = pd.read_csv('targets/NHI_data_February2025_fixed.csv')
+df = pd.read_csv('targets/NHI_data_August2025.csv')
 df=df.sort_values(by='distance (pc)', ascending=True)
 df.reset_index(inplace=True)
 

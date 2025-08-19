@@ -39,13 +39,14 @@ def haversine(lon1, lat1, lon2, lat2):
         r = 1.0
         return c * r # should be in radians
 
-stars = np.loadtxt('NHI_column_fitted_stars_all.txt')
-RA = stars[:,0]
-DEC = stars[:,1]
-## calculating separations from ALL stars
-Z = np.zeros(phi_grid.shape)
-Z2 = np.zeros(phi_grid.shape) # numbers of stars within 20 degrees?
-for i in range(len(theta)):
+if False: 
+    stars = pd.read_csv('targets/NHI_data_August2025.csv') #np.loadtxt('NHI_column_fitted_stars_all.txt')
+    RA = stars['RA']
+    DEC = stars['DEC']
+    ## calculating separations from ALL stars
+    Z = np.zeros(phi_grid.shape)
+    Z2 = np.zeros(phi_grid.shape) # numbers of stars within 20 degrees?
+    for i in range(len(theta)):
 
         print(i)
 
@@ -71,20 +72,20 @@ for i in range(len(theta)):
             Z2[i,j] = (sep_array <= (20. * np.pi/180.)).sum() ## counting the number of stars within 20 degrees of a particular point
 
 
-fig = plt.figure()
-ax = fig.add_subplot(111,projection='mollweide')
-im = ax.pcolor(-phi+np.pi, theta, Z*180./np.pi)
-plt.colorbar(im)
-CS=ax.contour(-phi+np.pi,theta,Z*180./np.pi,
+    fig = plt.figure()
+    ax = fig.add_subplot(111,projection='mollweide')
+    im = ax.pcolor(-phi+np.pi, theta, Z*180./np.pi)
+    plt.colorbar(im)
+    CS=ax.contour(-phi+np.pi,theta,Z*180./np.pi,
         levels=[20.],colors='k')
 
-fig = plt.figure()
-ax = fig.add_subplot(111,projection='mollweide')
-im = ax.pcolor(-phi+np.pi, theta, Z2)
-plt.colorbar(im)
-CS=ax.contour(-phi+np.pi,theta,Z2,
+    fig = plt.figure()
+    ax = fig.add_subplot(111,projection='mollweide')
+    im = ax.pcolor(-phi+np.pi, theta, Z2)
+    plt.colorbar(im)
+    CS=ax.contour(-phi+np.pi,theta,Z2,
         levels=[3.],colors='k')
-ax.clabel(CS, inline=True, fontsize=10)
+    ax.clabel(CS, inline=True, fontsize=10)
 
 if False:
  for i in range(len(file_prefixes)):
@@ -260,13 +261,15 @@ cloud_name = 'Blue'
 df_cloud = pd.read_csv(cloud_path + cloud_name + '_ra_dec.csv')
 #fig.text(0.5,0.95,cloud_name.replace('_',''),fontsize=22)
 
-#file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/July2024/'
-file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/Feb2025/'
+file_path = '/Users/aayoungb/Documents/GitHub/LISM_map/Aug2025/'
 file_prefixes = ['all_inside_10pc','10_20pc','20_30pc','30_50pc','50_70pc','70_100pc']
 titles = ['$<$10 pc','10-20 pc','20-30 pc','30-50 pc','50-70 pc','70-100 pc']
 #params = ['amp', 'amp2', 'avg','scale','scale2']
 
 #import pdb; pdb.set_trace()
+
+df_results = pd.DataFrame(columns=['shell','median','upper','lower','stddev','nstars'])
+
 for i in range(len(file_prefixes)):
 
     df = pd.read_csv(file_path+'Bestfit_hyperparameters_' + file_prefixes[i] + '_upperlowerlimits.csv')
@@ -297,6 +300,7 @@ for i in range(len(file_prefixes)):
 
     for j in range(len(params)):
         print(params[j],np.exp(df['mean'].loc[j]),np.exp(df['median'].loc[j]), np.exp(df['84.1%'].loc[j])-np.exp(df['median'].loc[j]), np.exp(df['median'].loc[j])-np.exp(df['15.9%'].loc[j]))
+
 
 
     print('avg from map = ',np.mean(q[1]), np.mean(unc), np.percentile(q[1],[15.9,50,84.1]), np.percentile(q[1]-q[0],[15.9,50,84.1]), np.percentile(q[2]-q[1],[15.9,50,84.1]))
@@ -379,7 +383,10 @@ for i in range(len(file_prefixes)):
     plt.plot(np.arange(len(residuals)), residuals,'o')
     plt.title(titles[i])
 
+    df_results.loc[i] = [titles[i], np.exp(df['median'].loc[1]), np.exp(df['84.1%'].loc[1])-np.exp(df['median'].loc[1]), np.exp(df['median'].loc[1])-np.exp(df['15.9%'].loc[1]), np.std(residuals),   len(stars)]
 
+
+df_results.to_csv('Table1_results.csv')
 if make_fig:
     cax=fig.add_axes([0.11, 0.06, 0.78, 0.02])
 
