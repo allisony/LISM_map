@@ -92,6 +92,8 @@ t3 = t2['Latex Name', 'l', 'b', 'distance (pc)', 'N(HI)', 'N(HI) uncertainty', '
 ascii.write(t3,format='latex')
 
 
+t3.write('TargetTable.ecsv', overwrite=True)
+
 """
 def D_column_calc(logDs,sig_logDs):
     D = np.sum(10**logDs)
